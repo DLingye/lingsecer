@@ -1,7 +1,7 @@
 import hashlib
 import base64
-__name__ = "nightsecer_genpw"
-__version__ = "250722"
+__name__ = "LingSecer_Seed"
+__version__ = "250803"
 __author__ = "DONGFANG Lingye"
 __email__ = "ly@lingye.online"
 
@@ -20,7 +20,7 @@ def split_by_n(s, n):
     # 按n位分割，舍弃最后不足n位的部分
     return [s[i:i+n] for i in range(0, len(s) - len(s)%n, n)]
 
-def genpw(ins):
+def gen_seed(ins):
     try:
         items = str(ins).strip().split()
         if len(items) < 2:
@@ -51,7 +51,7 @@ def genpw(ins):
             elif mode == '2':
                 data = all_base64
             else:
-                raise ErrMode("ErrMode，应为1（sha512）或2（base64）")
+                raise ErrMode("ErrMode")
             slices = split_by_n(data, slice_len)
             result = slices + [len(slices)]
             return result
@@ -69,14 +69,14 @@ def genpw(ins):
             elif mode == '2':
                 data = all_base64
             else:
-                raise ErrMode("ErrMode，应为1（sha512）或2（base64）")
+                raise ErrMode("ErrMode")
             slices = split_by_n(data, slice_len)
             if slice_index >= len(slices):
                 raise ErrSliceIndexOutOfRange("SliceIndexOutOfRange")
             result = [slices[slice_index], len(slices)]
             return result
         else:
-            raise ErrParamFormat("BadParamFormat，应为如2-16或2-16-1")
+            raise ErrParamFormat("BadParamFormat")
     except ErrParamFormat as e:
         print("Err:", e)
     except ErrSliceLen as e:
