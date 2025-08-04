@@ -1,8 +1,8 @@
 from Crypto.PublicKey import RSA
 from hashlib import sha512
 
-__name__ = "LingSecer_GenKey"
-__version__ = "250803"
+__mainame__ = "LingSecer_GenKey"
+__version__ = "250804"
 __author__ = "DONGFANG Lingye"
 __email__ = "ly@lingye.online"
 

@@ -1,7 +1,7 @@
 import hashlib
 import base64
-__name__ = "LingSecer_Seed"
-__version__ = "250803"
+__mainame__ = "LingSecer_Seed"
+__version__ = "250804"
 __author__ = "DONGFANG Lingye"
 __email__ = "ly@lingye.online"
 
