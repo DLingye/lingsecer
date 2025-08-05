@@ -1,9 +1,10 @@
+MAINAME = "LingSecer"
+VERSION = "250805"
+AUTHOR = "DONGFANG Lingye"
+EMAIL = "ly@lingye.online"
+
 import hashlib
 import base64
-__mainame__ = "LingSecer_Seed"
-__version__ = "250804"
-__author__ = "DONGFANG Lingye"
-__email__ = "ly@lingye.online"
 
 class ErrParamFormat(Exception):
     pass

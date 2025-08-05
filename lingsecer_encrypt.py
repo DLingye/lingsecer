@@ -1,11 +1,11 @@
+MAINAME = "LingSecer"
+VERSION = "250805"
+AUTHOR = "DONGFANG Lingye"
+EMAIL = "ly@lingye.online"
+
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_v1_5
 import base64
-
-__mainame__ = "LingSecer_Encrypt"
-__version__ = "250804"
-__author__ = "DONGFANG Lingye"
-__email__ = "ly@lingye.online"
 
 def encrypt_with_public_key(plaintext, pubkey_str):
     pubkey = RSA.import_key(pubkey_str)

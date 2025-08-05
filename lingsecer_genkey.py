@@ -1,10 +1,10 @@
+MAINAME = "LingSecer"
+VERSION = "250805"
+AUTHOR = "DONGFANG Lingye"
+EMAIL = "ly@lingye.online"
+
 from Crypto.PublicKey import RSA
 from hashlib import sha512
-
-__mainame__ = "LingSecer_GenKey"
-__version__ = "250804"
-__author__ = "DONGFANG Lingye"
-__email__ = "ly@lingye.online"
 
 def deterministic_randfunc(seed):
     # 生成一个确定性的伪随机字节流
@@ -31,8 +31,3 @@ def deterministic_rsa_key(seed_str=None, key_size=1024):
 def ling_genkey(seed_str=None, key_size=1024):
     priv_key, pub_key = deterministic_rsa_key(seed_str, key_size)
     return priv_key.decode(), pub_key.decode()
-
-# 用法
-#priv, pub = deterministic_rsa_key('a')
-#print(priv.decode())
-#print(pub.decode())

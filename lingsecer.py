@@ -1,3 +1,8 @@
+MAINAME = "LingSecer"
+VERSION = "250805"
+AUTHOR = "DONGFANG Lingye"
+EMAIL = "ly@lingye.online"
+
 import os
 import json
 import datetime
@@ -10,11 +15,7 @@ import hashlib
 from lingsecer_seed import gen_seed
 from lingsecer_genkey import ling_genkey
 from lingsecer_encrypt import ling_encrypt, ling_decrypt
-
-__mainame__ = "LingSecer"
-__version__ = "250804"
-__author__ = "DONGFANG Lingye"
-__email__ = "ly@lingye.online"
+from lingsecer_localkey import import_key, list_key, del_key
 
 l_time = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
 timezone = time.strftime('%Z', time.localtime())
@@ -24,7 +25,7 @@ def key_gen_json(owner_name, owner_mail, comment, mode, time, priv_encrypted,
     #生成pub_key的SHA512作为唯一id,全部使用大写
     lkid = hashlib.sha512(pub_key.encode('utf-8')).hexdigest().upper()
     data = {
-        "version": __version__,
+        "version": VERSION,
         "lkid": lkid,
         "name": owner_name,
         "email": owner_mail,
@@ -47,7 +48,7 @@ def encrypted_to_json(plaintext_file, ciphertext):
     time=timezone+'_'+l_time
     lfid = hashlib.sha512(ciphertext.encode('utf-8')).hexdigest().upper()
     out_data = {
-        "version": __version__,
+        "version": VERSION,
         "lfid": lfid,
         "plaintext_file": plaintext_file,
         "time": time,
@@ -100,8 +101,6 @@ def gen_key():
     else:
         ins = phrase + " " + "2-" + strength
         result = gen_seed(ins)
-        #print("生成的种子片段：")
-        #print(result)
         priv, pub = ling_genkey(result[-2])
         print("Private_Key:")
         print(priv)
@@ -189,9 +188,49 @@ def decrypt_file():
     except Exception as e:
         print("ErrDecryptFailed", e)
 
+def local_key(command):
+    if command == "import":
+        key_file = input("Import from:").strip()
+        out=import_key(key_file)
+        if out == "ErrFileNotFound":
+            return "ErrFileNotFound"
+        elif out == "ErrKeyAlreadyExists":
+            return "ErrKeyAlreadyExists"
+        else:
+            output=out[0]
+            print(str(output[0])+" "+output[1]+"\n"+output[2]+"\n"+output[3]+" <"+output[4]+"> "+" "+output[5]+"\n"+output[6])
+    elif command == "list":
+        out=list_key()
+        if out == "NoLocalKeyFile":
+            return "NoLocalKeyFile"
+        elif out == "NoLocalKey":
+            return "NoLocalKey"
+        elif out == "ErrNoMatchKey":
+            return "ErrNoMatchKey"
+        else:
+            #输出为像上面一样的易读形式
+            result = []
+            for output in out:
+                print(str(output[0])+" "+output[1]+"\n"+output[2]+"\n"+output[3]+" <"+output[4]+"> "+" "+output[5]+"\n"+output[6])
+    elif command == "del":
+        lkid = input("Delete by lkid (default skip):").strip()
+        lkid_short = input("Delete by lkid_short (default skip):").strip()
+        name = input("Delete by name:").strip()
+        out=del_key(lkid=lkid, lkid_short=lkid_short, name=name)
+        if out == "NoLocalKeyFile":
+            return "NoLocalKeyFile"
+        elif out == "NoLocalKey":
+            return "NoLocalKey"
+        elif out == "ErrNoMatchKey":
+            return "ErrNoMatchKey"
+        elif out == 0:
+            return "OK."
+    else:
+        return "ErrBadCommand"
+
 
 def main():
-    print(__mainame__+" Ver "+__version__)
+    print(MAINAME+" Ver "+VERSION)
     while True:
         cmd = input("]").strip().lower()
         if cmd == "q":
@@ -205,6 +244,12 @@ def main():
             encrypt_file()
         elif cmd == "defile":
             decrypt_file()
+        elif cmd == "importkey":
+            local_key("import")
+        elif cmd == "listkey":
+            local_key("list")
+        elif cmd == "delkey":
+            local_key("del")
         else:
             print("ErrCommandNotFound")
 
