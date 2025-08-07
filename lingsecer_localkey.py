@@ -8,11 +8,10 @@ import json
 
 LOCAL_KEY_FILE = "lingsecer_localkey.json"
 
-def import_key(key_file):
-    if not os.path.isfile(key_file):
-        return "ErrFileNotFound"
-    with open(key_file, "r", encoding="utf-8") as f:
-        key_data = json.load(f)
+#修改import_key()，使其仅接收要导入的key的json数据，而不是文件名
+def import_key(key_data):
+    if not key_data:
+        return "ErrNoData"
     # 读取本地密钥库
     if os.path.isfile(LOCAL_KEY_FILE):
         with open(LOCAL_KEY_FILE, "r", encoding="utf-8") as f:
@@ -85,4 +84,22 @@ def del_key(lkid="", lkid_short="", name=""):
         json.dump(filtered_keys, f, ensure_ascii=False, indent=4)
     return 0
 
-del_key(lkid_short="85D0A926C5064AAD")
+def load_key(lkid="", lkid_short="", name=""):
+    #这个函数加载指定的lkid或lkid_short或name的密钥，并将json数据返回为字典
+    if not os.path.isfile(LOCAL_KEY_FILE):
+        return "NoLocalKeyFile"
+    with open(LOCAL_KEY_FILE, "r", encoding="utf-8") as f:
+        local_keys = json.load(f)
+    if not local_keys:
+        return "NoLocalKey"
+    for key in local_keys:
+        key_lkid = key.get('lkid', '')
+        key_name = key.get('name', '')
+        key_lkid_short = key_lkid[:8] + key_lkid[-8:] if len(key_lkid) >= 16 else key_lkid
+        if (lkid and key_lkid == lkid) or \
+           (lkid_short and key_lkid_short == lkid_short) or \
+           (name and key_name == name):
+            return key
+    return "ErrNoMatchKey"
+
+#del_key(lkid_short="85D0A926C5064AAD")

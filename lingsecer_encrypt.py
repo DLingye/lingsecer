@@ -4,21 +4,21 @@ AUTHOR = "DONGFANG Lingye"
 EMAIL = "ly@lingye.online"
 
 from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_v1_5
+from Crypto.Cipher import PKCS1_OAEP
 import base64
 
 def encrypt_with_public_key(plaintext, pubkey_str):
     pubkey = RSA.import_key(pubkey_str)
-    cipher = PKCS1_v1_5.new(pubkey)
+    cipher = PKCS1_OAEP.new(pubkey)
     ciphertext = cipher.encrypt(plaintext.encode('utf-8'))
     return base64.b64encode(ciphertext).decode('utf-8')
 
 def decrypt_with_private_key(ciphertext_b64, privkey_str):
     privkey = RSA.import_key(privkey_str)
-    cipher = PKCS1_v1_5.new(privkey)
+    cipher = PKCS1_OAEP.new(privkey)
     ciphertext = base64.b64decode(ciphertext_b64)
     sentinel = b'error'
-    plaintext = cipher.decrypt(ciphertext, sentinel)
+    plaintext = cipher.decrypt(ciphertext)
     if plaintext == sentinel:
         raise ValueError("解密失败，私钥不匹配或数据损坏")
     return plaintext.decode('utf-8')

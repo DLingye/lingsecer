@@ -18,7 +18,7 @@ def deterministic_randfunc(seed):
         return data[:n]
     return randfunc
 
-def deterministic_rsa_key(seed_str=None, key_size=1024):
+def deterministic_rsa_key(seed_str=None, key_size=4096):
     if not seed_str:
         # 无种子时，使用系统随机源
         key = RSA.generate(key_size)
@@ -28,6 +28,6 @@ def deterministic_rsa_key(seed_str=None, key_size=1024):
         key = RSA.generate(key_size, randfunc=randfunc)
     return key.export_key(), key.publickey().export_key()
 
-def ling_genkey(seed_str=None, key_size=1024):
+def ling_genkey(seed_str=None, key_size=4096):
     priv_key, pub_key = deterministic_rsa_key(seed_str, key_size)
     return priv_key.decode(), pub_key.decode()

@@ -5,8 +5,6 @@ EMAIL = "ly@lingye.online"
 
 import os
 import json
-import datetime
-import time
 import base64
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
@@ -15,35 +13,14 @@ import hashlib
 from lingsecer_seed import gen_seed
 from lingsecer_genkey import ling_genkey
 from lingsecer_encrypt import ling_encrypt, ling_decrypt
-from lingsecer_localkey import import_key, list_key, del_key
+from lingsecer_localkey import import_key, list_key, del_key, load_key
+from lingsecer_todata import key_to_json, encrypted_file_to_data
+import lingsecer_gettime
 
-l_time = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-timezone = time.strftime('%Z', time.localtime())
+l_time = lingsecer_gettime.l_time
+timezone = lingsecer_gettime.timezone
 
-def key_gen_json(owner_name, owner_mail, comment, mode, time, priv_encrypted, 
-           pub_key, priv_key):
-    #生成pub_key的SHA512作为唯一id,全部使用大写
-    lkid = hashlib.sha512(pub_key.encode('utf-8')).hexdigest().upper()
-    data = {
-        "version": VERSION,
-        "lkid": lkid,
-        "name": owner_name,
-        "email": owner_mail,
-        "comment": comment,
-        "mode": mode,
-        "time": time,
-        "priv_encrypted": priv_encrypted,
-        "pub_key": pub_key,
-        "priv_key": priv_key
-    }
-    filename = input("File name (default: {}): ".format(f"{owner_name}_priv.json")).strip()
-    if not filename:
-        filename = f"{owner_name}_priv.json"
-    with open(filename, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-    print("OK.")
-
-def encrypted_to_json(plaintext_file, ciphertext):
+def encrypted_file_to_data(plaintext_file, ciphertext):
     output_json = plaintext_file + ".json"
     time=timezone+'_'+l_time
     lfid = hashlib.sha512(ciphertext.encode('utf-8')).hexdigest().upper()
@@ -88,12 +65,16 @@ def gen_key():
     owner_mail = input("Email:").strip()
     comment = input("Comment:").strip()
     phrase = input("Seed phrase:").strip()
+    key_strength = input("RSA Key strength (default 4096):").strip()
+    if not key_strength.isdigit() or not (1024 <= int(key_strength) <= 16384) or key_strength == "":
+        key_strength = "4096"
+    key_strength = int(key_strength)
     strength = input("Key strength (1-64, default 64):").strip()
     if not strength.isdigit() or not (1 <= int(strength) <= 64) or strength == "":
         strength = "64"
     if phrase == "":
         # 留空则生成随机密钥
-        priv, pub = ling_genkey(None)
+        priv, pub = ling_genkey(None, key_strength)
         print("Private_Key:")
         print(priv)
         print("Public_Key:")
@@ -101,7 +82,7 @@ def gen_key():
     else:
         ins = phrase + " " + "2-" + strength
         result = gen_seed(ins)
-        priv, pub = ling_genkey(result[-2])
+        priv, pub = ling_genkey(result[-2], key_strength)
         print("Private_Key:")
         print(priv)
         print("Public_Key:")
@@ -113,33 +94,61 @@ def gen_key():
         priv_encrypted = True
     else:
         priv_encrypted = False
-    key_gen_json(owner_name, owner_mail, comment, mode='encrypt', 
+    j_data = key_to_json(owner_name, owner_mail, comment, mode='encrypt', 
            time=timezone+'_'+l_time, priv_encrypted=priv_encrypted, 
            pub_key=pub, priv_key=priv)
-    
+    # 直接导入密钥库
+    out = import_key(j_data)
+    if out == "ErrFileNotFound":
+        print("ErrFileNotFound")
+    elif out == "ErrKeyAlreadyExists":
+        print("ErrKeyAlreadyExists")
+    else:
+        output = out[0]
+        print(str(output[0])+" "+output[1]+"\n"+output[2]+"\n"+output[3]+" <"+output[4]+"> "
+              +" "+output[5]+"\n"+output[6])
+
 def decrypt_key():
-    json_filename = input("File to decrypt:").strip()
-    with open(json_filename, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    json_filename = input("File to decrypt (leave empty to use local key):").strip()
+    if json_filename:
+        # 指定了外部密钥文件
+        with open(json_filename, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        # 未指定文件，要求输入本地密钥库的lkid/lkid_short/name
+        lkid = input("Input lkid (leave empty to skip):").strip()
+        lkid_short = input("Input lkid_short (leave empty to skip):").strip()
+        name = input("Input name (leave empty to skip):").strip()
+        data = load_key(lkid=lkid, lkid_short=lkid_short, name=name)
+        if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
+            print(data)
+            return
     priv_encrypted = data.get("priv_encrypted", False)
     priv_key = data.get("priv_key", "")
+    pub_key = data.get("pub_key", "")
     if priv_encrypted:
         password = input("Passphrase for private key:").strip()
         password = text_to_base64(password)
         try:
             priv_key = aes_decrypt(priv_key, password)
+            print(pub_key)
             print("Decrypted private key:")
             print(priv_key)
         except Exception as e:
             print("Err, password may be incorrect.")
-    else:
-        print("Private key:")
-        print(priv_key)
 
 def encrypt_file():
-    json_filename = input("File containing public key:").strip()
-    with open(json_filename, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    #修改这个函数，使其通过load_key()加载本地密钥库,而不是通过读取外部密钥
+    lkid = input("Input lkid (leave empty to skip):").strip()
+    lkid_short = input("Input lkid_short (leave empty to skip):").strip()
+    name = input("Input name (leave empty to skip):").strip()
+    data = load_key(lkid=lkid, lkid_short=lkid_short, name=name)
+    if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
+        print(data)
+        return
+    if not data:
+        print("No key found.")
+        return
     pub_key = data.get("pub_key", "")
     if not pub_key:
         print("ErrPubkeyNotFound")
@@ -149,12 +158,17 @@ def encrypt_file():
         plaintext = f.read()
     ciphertext = ling_encrypt(plaintext, pub_key)
     print(ciphertext)
-    encrypted_to_json(plaintext_file, ciphertext)
+    encrypted_file_to_data(plaintext_file, ciphertext)
 
 def decrypt_file():
-    json_filename = input("File containing private key:").strip()
-    with open(json_filename, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    #修改这个函数，使其通过load_key()加载本地密钥库,而不是通过读取外部密钥
+    lkid = input("Input lkid (leave empty to skip):").strip()
+    lkid_short = input("Input lkid_short (leave empty to skip):").strip()
+    name = input("Input name (leave empty to skip):").strip()
+    data = load_key(lkid=lkid, lkid_short=lkid_short, name=name)
+    if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
+        print(data)
+        return
     priv_encrypted = data.get("priv_encrypted", False)
     priv_key = data.get("priv_key", "")
     if priv_encrypted:
@@ -198,7 +212,8 @@ def local_key(command):
             return "ErrKeyAlreadyExists"
         else:
             output=out[0]
-            print(str(output[0])+" "+output[1]+"\n"+output[2]+"\n"+output[3]+" <"+output[4]+"> "+" "+output[5]+"\n"+output[6])
+            print(str(output[0])+" "+output[1]+"\n"+output[2]+"\n"+output[3]+" <"+output[4]+"> "
+                  +" "+output[5]+"\n"+output[6])
     elif command == "list":
         out=list_key()
         if out == "NoLocalKeyFile":
@@ -211,7 +226,8 @@ def local_key(command):
             #输出为像上面一样的易读形式
             result = []
             for output in out:
-                print(str(output[0])+" "+output[1]+"\n"+output[2]+"\n"+output[3]+" <"+output[4]+"> "+" "+output[5]+"\n"+output[6])
+                print(str(output[0])+" "+output[1]+"\n"+output[2]+"\n"+output[3]+" <"+output[4]+"> "
+                      +" "+output[5]+"\n"+output[6])
     elif command == "del":
         lkid = input("Delete by lkid (default skip):").strip()
         lkid_short = input("Delete by lkid_short (default skip):").strip()
@@ -233,16 +249,16 @@ def main():
     print(MAINAME+" Ver "+VERSION)
     while True:
         cmd = input("]").strip().lower()
-        if cmd == "q":
+        if cmd == "quit" or cmd == "exit":
             print("Bye!")
             break
         elif cmd == "genkey":
             gen_key()
-        elif cmd == "dekey":
-            decrypt_key()
-        elif cmd == "enfile":
+        #elif cmd == "dekey":
+        #    decrypt_key()
+        elif cmd == "encrypt":
             encrypt_file()
-        elif cmd == "defile":
+        elif cmd == "decrypt":
             decrypt_file()
         elif cmd == "importkey":
             local_key("import")
