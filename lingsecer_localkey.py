@@ -1,5 +1,5 @@
-MAINAME = "LingSecer"
-VERSION = "250805"
+MAINAME = "LingSecer_LocalKey"
+VERSION = "250808"
 AUTHOR = "DONGFANG Lingye"
 EMAIL = "ly@lingye.online"
 
@@ -8,7 +8,6 @@ import json
 
 LOCAL_KEY_FILE = "lingsecer_localkey.json"
 
-#修改import_key()，使其仅接收要导入的key的json数据，而不是文件名
 def import_key(key_data):
     if not key_data:
         return "ErrNoData"
@@ -56,8 +55,9 @@ def list_key(lkid="", lkid_short="", name=""):
         key_email = key.get('email', '')
         key_comment = key.get('comment', '')
         key_date = key.get('time', '')
+        key_length = key.get('key_length', '')
         key_lkid_short = key_lkid[:8] + key_lkid[-8:] if len(key_lkid) >= 16 else key_lkid
-        result.append((idx, key_lkid, key_lkid_short, key_name, key_email, key_comment, key_date))
+        result.append((idx, key_lkid, key_lkid_short, key_name, key_email, key_comment, key_date, key_length))
     return result
 
 #通过指定的lkid或lkid_short或name删除密钥
@@ -85,7 +85,6 @@ def del_key(lkid="", lkid_short="", name=""):
     return 0
 
 def load_key(lkid="", lkid_short="", name=""):
-    #这个函数加载指定的lkid或lkid_short或name的密钥，并将json数据返回为字典
     if not os.path.isfile(LOCAL_KEY_FILE):
         return "NoLocalKeyFile"
     with open(LOCAL_KEY_FILE, "r", encoding="utf-8") as f:
@@ -95,11 +94,10 @@ def load_key(lkid="", lkid_short="", name=""):
     for key in local_keys:
         key_lkid = key.get('lkid', '')
         key_name = key.get('name', '')
+        #key_length = key.get('key_length', '')
         key_lkid_short = key_lkid[:8] + key_lkid[-8:] if len(key_lkid) >= 16 else key_lkid
         if (lkid and key_lkid == lkid) or \
            (lkid_short and key_lkid_short == lkid_short) or \
            (name and key_name == name):
             return key
     return "ErrNoMatchKey"
-
-#del_key(lkid_short="85D0A926C5064AAD")

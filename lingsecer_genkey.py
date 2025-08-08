@@ -1,5 +1,5 @@
-MAINAME = "LingSecer"
-VERSION = "250805"
+MAINAME = "LingSecer_GenKey"
+VERSION = "250808"
 AUTHOR = "DONGFANG Lingye"
 EMAIL = "ly@lingye.online"
 

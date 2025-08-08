@@ -1,5 +1,5 @@
 MAINAME = "LingSecer"
-VERSION = "250805"
+VERSION = "250808"
 AUTHOR = "DONGFANG Lingye"
 EMAIL = "ly@lingye.online"
 
@@ -39,19 +39,30 @@ def encrypted_file_to_data(plaintext_file, ciphertext):
 def aes_encrypt(data, password):
     key = password.encode('utf-8')
     key = key[:32].ljust(32, b'\0')  # AES-256
-    iv = b'LingSecerAESInit'  # 16字节IV
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    ct_bytes = cipher.encrypt(pad(data.encode('utf-8'), AES.block_size))
-    return base64.b64encode(ct_bytes).decode('utf-8')
+    cipher = AES.new(key, AES.MODE_GCM)
+    nonce = cipher.nonce  # 12字节随机IV
+    ct_bytes, tag = cipher.encrypt_and_digest(data.encode('utf-8'))
+    # 拼接 nonce + tag + ciphertext，均为base64编码后用“:”分隔，返回单一字符串
+    result = (
+        base64.b64encode(nonce).decode('utf-8') + ":" +
+        base64.b64encode(tag).decode('utf-8') + ":" +
+        base64.b64encode(ct_bytes).decode('utf-8')
+    )
+    return result
 
 def aes_decrypt(enc_data, password):
     key = password.encode('utf-8')
     key = key[:32].ljust(32, b'\0')  # AES-256
-    iv = b'LingSecerAESInit'
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    ct = base64.b64decode(enc_data)
-    from Crypto.Util.Padding import unpad
-    return unpad(cipher.decrypt(ct), AES.block_size).decode('utf-8')
+    # 拆分字符串
+    try:
+        nonce_b64, tag_b64, ct_b64 = enc_data.split(":")
+        nonce = base64.b64decode(nonce_b64)
+        tag = base64.b64decode(tag_b64)
+        ct = base64.b64decode(ct_b64)
+    except Exception:
+        raise ValueError("Invalid encrypted data format")
+    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+    return cipher.decrypt_and_verify(ct, tag).decode('utf-8')
 
 def text_to_base64(s):
     sha256 = hashlib.sha256(s.encode('utf-8')).digest()
@@ -65,11 +76,11 @@ def gen_key():
     owner_mail = input("Email:").strip()
     comment = input("Comment:").strip()
     phrase = input("Seed phrase:").strip()
+    strength = input("Key strength (1-64, default 64):").strip()
     key_strength = input("RSA Key strength (default 4096):").strip()
     if not key_strength.isdigit() or not (1024 <= int(key_strength) <= 16384) or key_strength == "":
         key_strength = "4096"
     key_strength = int(key_strength)
-    strength = input("Key strength (1-64, default 64):").strip()
     if not strength.isdigit() or not (1 <= int(strength) <= 64) or strength == "":
         strength = "64"
     if phrase == "":
@@ -96,7 +107,7 @@ def gen_key():
         priv_encrypted = False
     j_data = key_to_json(owner_name, owner_mail, comment, mode='encrypt', 
            time=timezone+'_'+l_time, priv_encrypted=priv_encrypted, 
-           pub_key=pub, priv_key=priv)
+           pub_key=pub, priv_key=priv, key_length=key_strength)
     # 直接导入密钥库
     out = import_key(j_data)
     if out == "ErrFileNotFound":
@@ -105,13 +116,12 @@ def gen_key():
         print("ErrKeyAlreadyExists")
     else:
         output = out[0]
-        print(str(output[0])+" "+output[1]+"\n"+output[2]+"\n"+output[3]+" <"+output[4]+"> "
+        print(str(output[0])+" "+output[1]+"\n"+output[2]+" "+str(output[7])+"\n"+output[3]+" <"+output[4]+"> "
               +" "+output[5]+"\n"+output[6])
 
 def decrypt_key():
     json_filename = input("File to decrypt (leave empty to use local key):").strip()
     if json_filename:
-        # 指定了外部密钥文件
         with open(json_filename, "r", encoding="utf-8") as f:
             data = json.load(f)
     else:
@@ -138,7 +148,6 @@ def decrypt_key():
             print("Err, password may be incorrect.")
 
 def encrypt_file():
-    #修改这个函数，使其通过load_key()加载本地密钥库,而不是通过读取外部密钥
     lkid = input("Input lkid (leave empty to skip):").strip()
     lkid_short = input("Input lkid_short (leave empty to skip):").strip()
     name = input("Input name (leave empty to skip):").strip()
@@ -150,18 +159,18 @@ def encrypt_file():
         print("No key found.")
         return
     pub_key = data.get("pub_key", "")
+    key_length = int(data.get("key_length", ''))
     if not pub_key:
         print("ErrPubkeyNotFound")
         return
     plaintext_file = input("File to encrypt:").strip()
     with open(plaintext_file, "r", encoding="utf-8") as f:
         plaintext = f.read()
-    ciphertext = ling_encrypt(plaintext, pub_key)
+    ciphertext = ling_encrypt(plaintext, pub_key, key_length)
     print(ciphertext)
     encrypted_file_to_data(plaintext_file, ciphertext)
 
 def decrypt_file():
-    #修改这个函数，使其通过load_key()加载本地密钥库,而不是通过读取外部密钥
     lkid = input("Input lkid (leave empty to skip):").strip()
     lkid_short = input("Input lkid_short (leave empty to skip):").strip()
     name = input("Input name (leave empty to skip):").strip()
@@ -195,7 +204,6 @@ def decrypt_file():
         plaintext = ling_decrypt(ciphertext_b64, priv_key)
         print("Decryption result:")
         print(plaintext)
-        # Write back to the original file
         with open(plaintext_file, "w", encoding="utf-8") as f:
             f.write(plaintext)
         print(f"OK.")
@@ -223,7 +231,6 @@ def local_key(command):
         elif out == "ErrNoMatchKey":
             return "ErrNoMatchKey"
         else:
-            #输出为像上面一样的易读形式
             result = []
             for output in out:
                 print(str(output[0])+" "+output[1]+"\n"+output[2]+"\n"+output[3]+" <"+output[4]+"> "
