@@ -1,5 +1,5 @@
 MAINAME = "LingSecer"
-VERSION = "250808"
+VERSION = "250809"
 AUTHOR = "DONGFANG Lingye"
 EMAIL = "ly@lingye.online"
 
@@ -16,6 +16,7 @@ from lingsecer_encrypt import ling_encrypt, ling_decrypt
 from lingsecer_localkey import import_key, list_key, del_key, load_key
 from lingsecer_todata import key_to_json, encrypted_file_to_data
 import lingsecer_gettime
+from lingsecer_compress import compress_data, decompress_data
 
 l_time = lingsecer_gettime.l_time
 timezone = lingsecer_gettime.timezone
@@ -159,16 +160,16 @@ def encrypt_file():
         print("No key found.")
         return
     pub_key = data.get("pub_key", "")
-    key_length = int(data.get("key_length", ''))
     if not pub_key:
         print("ErrPubkeyNotFound")
         return
     plaintext_file = input("File to encrypt:").strip()
-    with open(plaintext_file, "r", encoding="utf-8") as f:
+    with open(plaintext_file, "rb") as f:
         plaintext = f.read()
-    ciphertext = ling_encrypt(plaintext, pub_key, key_length)
-    print(ciphertext)
-    encrypted_file_to_data(plaintext_file, ciphertext)
+    ciphertext = ling_encrypt(plaintext, pub_key)
+    compressed_ciphertext = compress_data(ciphertext)
+    print(compressed_ciphertext)
+    encrypted_file_to_data(plaintext_file, compressed_ciphertext)
 
 def decrypt_file():
     lkid = input("Input lkid (leave empty to skip):").strip()
@@ -195,7 +196,8 @@ def decrypt_file():
     ciphertext_json = input("File containing ciphertext:").strip()
     with open(ciphertext_json, "r", encoding="utf-8") as f:
         cipher_data = json.load(f)
-    ciphertext_b64 = cipher_data.get("ciphertext", "")
+    ciphertext_compressed = cipher_data.get("ciphertext", "")
+    ciphertext_b64 = decompress_data(ciphertext_compressed)
     plaintext_file = cipher_data.get("plaintext_file", "")
     if not ciphertext_b64 or not plaintext_file:
         print("ErrCiphertextOrPlaintextFileNotFound")
@@ -204,7 +206,7 @@ def decrypt_file():
         plaintext = ling_decrypt(ciphertext_b64, priv_key)
         print("Decryption result:")
         print(plaintext)
-        with open(plaintext_file, "w", encoding="utf-8") as f:
+        with open(plaintext_file, "wb") as f:
             f.write(plaintext)
         print(f"OK.")
     except Exception as e:

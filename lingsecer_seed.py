@@ -1,5 +1,5 @@
 MAINAME = "LingSecer_Seed"
-VERSION = "250808"
+VERSION = "250809"
 AUTHOR = "DONGFANG Lingye"
 EMAIL = "ly@lingye.online"
 
