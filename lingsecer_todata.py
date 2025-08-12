@@ -5,8 +5,10 @@ EMAIL = "ly@lingye.online"
 
 import hashlib
 import json
+import datetime, time
 
-import lingsecer_gettime
+l_time = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+timezone = time.strftime('%Z', time.localtime())
 
 def key_to_json(owner_name, owner_mail, comment, mode, time, priv_encrypted, 
            pub_key, priv_key, key_length):
@@ -38,8 +40,6 @@ def write_data(filename=None, data=None):
     return 0
 
 def encrypted_file_to_data(plaintext_file, ciphertext):
-    timezone = lingsecer_gettime.timezone
-    l_time = lingsecer_gettime.l_time
     output_json = plaintext_file + ".json"
     time=timezone+'_'+l_time
     lfid = hashlib.sha512(ciphertext.encode('utf-8')).hexdigest().upper()

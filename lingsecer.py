@@ -7,19 +7,18 @@ import os
 import json
 import base64
 from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad
 import hashlib
+import datetime, time
 
 from lingsecer_seed import gen_seed
 from lingsecer_genkey import ling_genkey
 from lingsecer_encrypt import ling_encrypt, ling_decrypt
 from lingsecer_localkey import import_key, list_key, del_key, load_key
 from lingsecer_todata import key_to_json, encrypted_file_to_data
-import lingsecer_gettime
 from lingsecer_compress import compress_data, decompress_data
 
-l_time = lingsecer_gettime.l_time
-timezone = lingsecer_gettime.timezone
+l_time = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+timezone = time.strftime('%Z', time.localtime())
 
 def encrypted_file_to_data(plaintext_file, ciphertext):
     output_json = plaintext_file + ".lsed"
@@ -151,10 +150,20 @@ def decrypt_key():
             print("Err, password may be incorrect.")
 
 def encrypt_file():
-    lkid = input("Input lkid (leave empty to skip):").strip()
-    lkid_short = input("Input lkid_short (leave empty to skip):").strip()
-    name = input("Input name (leave empty to skip):").strip()
-    data = load_key(lkid=lkid, lkid_short=lkid_short, name=name)
+    key_identifier = input("Input key identifier (lkid/lkid_short/name):").strip()
+    if not key_identifier:
+        print("Key identifier cannot be empty")
+        return
+    data = None
+    if len(key_identifier) == 64:
+        data = load_key(lkid=key_identifier)
+        if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
+            if len(key_identifier) == 8:
+                data = load_key(lkid_short=key_identifier)
+                if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
+                    data = load_key(name=key_identifier)
+    else:
+        data = load_key(name=key_identifier)
     if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
         print(data)
         return
@@ -174,10 +183,20 @@ def encrypt_file():
     encrypted_file_to_data(plaintext_file, compressed_ciphertext)
 
 def decrypt_file():
-    lkid = input("Input lkid (leave empty to skip):").strip()
-    lkid_short = input("Input lkid_short (leave empty to skip):").strip()
-    name = input("Input name (leave empty to skip):").strip()
-    data = load_key(lkid=lkid, lkid_short=lkid_short, name=name)
+    key_identifier = input("Input key identifier (lkid/lkid_short/name):").strip()
+    if not key_identifier:
+        print("Key identifier cannot be empty")
+        return
+    data = None
+    if len(key_identifier) == 64:
+        data = load_key(lkid=key_identifier)
+        if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
+            if len(key_identifier) == 8:
+                data = load_key(lkid_short=key_identifier)
+                if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
+                    data = load_key(name=key_identifier)
+    else:
+        data = load_key(name=key_identifier)
     if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
         print(data)
         return
@@ -194,7 +213,7 @@ def decrypt_file():
     if not priv_key:
         print("ErrPrivkeyNotFound")
         return
-    # 读取加密内容的json文件(可能是压缩的.json.zst或未压缩的.json)
+    # 读取加密内容的json文件
     ciphertext_json = input("File containing ciphertext:").strip()
     if ciphertext_json.endswith('.lsed'):
         with open(ciphertext_json, "rb") as f:
@@ -265,14 +284,12 @@ def local_key(command):
 def main():
     print(MAINAME+" Ver "+VERSION)
     while True:
-        cmd = input("]").strip().lower()
+        cmd = input("lingsecer>").strip().lower()
         if cmd == "quit" or cmd == "exit":
             print("Bye!")
             break
         elif cmd == "genkey":
             gen_key()
-        #elif cmd == "dekey":
-        #    decrypt_key()
         elif cmd == "encrypt":
             encrypt_file()
         elif cmd == "decrypt":

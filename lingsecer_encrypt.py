@@ -6,7 +6,6 @@ EMAIL = "ly@lingye.online"
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP, AES
 from Crypto.Random import get_random_bytes
-#from Crypto.Hash import SHA256
 import base64
 
 def encrypt_with_public_key(plaintext, pubkey_str):
