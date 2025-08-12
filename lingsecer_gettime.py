@@ -1,5 +1,5 @@
 MAINAME = "LingSecer_GetTime"
-VERSION = "250809"
+VERSION = "250812"
 AUTHOR = "DONGFANG Lingye"
 EMAIL = "ly@lingye.online"
 

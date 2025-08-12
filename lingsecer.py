@@ -1,5 +1,5 @@
 MAINAME = "LingSecer"
-VERSION = "250809"
+VERSION = "250812"
 AUTHOR = "DONGFANG Lingye"
 EMAIL = "ly@lingye.online"
 
@@ -22,19 +22,21 @@ l_time = lingsecer_gettime.l_time
 timezone = lingsecer_gettime.timezone
 
 def encrypted_file_to_data(plaintext_file, ciphertext):
-    output_json = plaintext_file + ".json"
+    output_json = plaintext_file + ".lsed"
     time=timezone+'_'+l_time
-    lfid = hashlib.sha512(ciphertext.encode('utf-8')).hexdigest().upper()
+    lfid = hashlib.sha512(ciphertext if isinstance(ciphertext, bytes) else ciphertext.encode('utf-8')).hexdigest().upper()
     out_data = {
         "version": VERSION,
         "lfid": lfid,
         "plaintext_file": plaintext_file,
         "time": time,
         "mode": "encrypt",
-        "ciphertext": ciphertext
+        "ciphertext": base64.b64encode(ciphertext).decode('utf-8') if isinstance(ciphertext, bytes) else ciphertext
     }
-    with open(output_json, "w", encoding="utf-8") as f:
-        json.dump(out_data, f, ensure_ascii=False, indent=4)
+    json_str = json.dumps(out_data, ensure_ascii=False, indent=4)
+    compressed = compress_data(json_str)
+    with open(output_json, "wb") as f:
+        f.write(compressed)
     print("OK.")
 
 def aes_encrypt(data, password):
@@ -192,10 +194,16 @@ def decrypt_file():
     if not priv_key:
         print("ErrPrivkeyNotFound")
         return
-    # 读取加密内容的json文件
+    # 读取加密内容的json文件(可能是压缩的.json.zst或未压缩的.json)
     ciphertext_json = input("File containing ciphertext:").strip()
-    with open(ciphertext_json, "r", encoding="utf-8") as f:
-        cipher_data = json.load(f)
+    if ciphertext_json.endswith('.lsed'):
+        with open(ciphertext_json, "rb") as f:
+            compressed_data = f.read()
+        json_str = decompress_data(compressed_data)
+        cipher_data = json.loads(json_str)
+    else:
+        with open(ciphertext_json, "r", encoding="utf-8") as f:
+            cipher_data = json.load(f)
     ciphertext_compressed = cipher_data.get("ciphertext", "")
     ciphertext_b64 = decompress_data(ciphertext_compressed)
     plaintext_file = cipher_data.get("plaintext_file", "")
