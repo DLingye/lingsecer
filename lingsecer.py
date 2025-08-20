@@ -1,5 +1,5 @@
 MAINAME = "LingSecer"
-VERSION = "250812"
+VERSION = "250820"
 AUTHOR = "DONGFANG Lingye"
 EMAIL = "ly@lingye.online"
 
@@ -14,7 +14,7 @@ from lingsecer_seed import gen_seed
 from lingsecer_genkey import ling_genkey
 from lingsecer_encrypt import ling_encrypt, ling_decrypt
 from lingsecer_localkey import import_key, list_key, del_key, load_key
-from lingsecer_todata import key_to_json, encrypted_file_to_data
+from lingsecer_todata import key_to_json
 from lingsecer_compress import compress_data, decompress_data
 
 l_time = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
@@ -54,15 +54,14 @@ def aes_encrypt(data, password):
 
 def aes_decrypt(enc_data, password):
     key = password.encode('utf-8')
-    key = key[:32].ljust(32, b'\0')  # AES-256
-    # 拆分字符串
-    try:
+    key = key[:32].ljust(32, b'\0')
+    try: # 拆分字符串
         nonce_b64, tag_b64, ct_b64 = enc_data.split(":")
         nonce = base64.b64decode(nonce_b64)
         tag = base64.b64decode(tag_b64)
         ct = base64.b64decode(ct_b64)
     except Exception:
-        raise ValueError("Invalid encrypted data format")
+        raise ValueError("ErrBadFormat")
     cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
     return cipher.decrypt_and_verify(ct, tag).decode('utf-8')
 
@@ -85,8 +84,7 @@ def gen_key():
     key_strength = int(key_strength)
     if not strength.isdigit() or not (1 <= int(strength) <= 64) or strength == "":
         strength = "64"
-    if phrase == "":
-        # 留空则生成随机密钥
+    if phrase == "": # 留空则生成随机密钥
         priv, pub = ling_genkey(None, key_strength)
         print("Private_Key:")
         print(priv)
@@ -177,43 +175,13 @@ def encrypt_file():
     plaintext_file = input("File to encrypt:").strip()
     with open(plaintext_file, "rb") as f:
         plaintext = f.read()
-    ciphertext = ling_encrypt(plaintext, pub_key)
+    lkid = data.get("lkid", "")
+    ciphertext = ling_encrypt(plaintext, pub_key, lkid)
     compressed_ciphertext = compress_data(ciphertext)
     print(compressed_ciphertext)
     encrypted_file_to_data(plaintext_file, compressed_ciphertext)
 
 def decrypt_file():
-    key_identifier = input("Input key identifier (lkid/lkid_short/name):").strip()
-    if not key_identifier:
-        print("Key identifier cannot be empty")
-        return
-    data = None
-    if len(key_identifier) == 64:
-        data = load_key(lkid=key_identifier)
-        if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
-            if len(key_identifier) == 8:
-                data = load_key(lkid_short=key_identifier)
-                if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
-                    data = load_key(name=key_identifier)
-    else:
-        data = load_key(name=key_identifier)
-    if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
-        print(data)
-        return
-    priv_encrypted = data.get("priv_encrypted", False)
-    priv_key = data.get("priv_key", "")
-    if priv_encrypted:
-        password = input("Passphrase for private key:").strip()
-        password = text_to_base64(password)
-        try:
-            priv_key = aes_decrypt(priv_key, password)
-        except Exception as e:
-            print("Err, password may be incorrect.")
-            return
-    if not priv_key:
-        print("ErrPrivkeyNotFound")
-        return
-    # 读取加密内容的json文件
     ciphertext_json = input("File containing ciphertext:").strip()
     if ciphertext_json.endswith('.lsed'):
         with open(ciphertext_json, "rb") as f:
@@ -221,16 +189,38 @@ def decrypt_file():
         json_str = decompress_data(compressed_data)
         cipher_data = json.loads(json_str)
     else:
-        with open(ciphertext_json, "r", encoding="utf-8") as f:
-            cipher_data = json.load(f)
+        print("ErrBadFormat")
+        return
     ciphertext_compressed = cipher_data.get("ciphertext", "")
     ciphertext_b64 = decompress_data(ciphertext_compressed)
     plaintext_file = cipher_data.get("plaintext_file", "")
     if not ciphertext_b64 or not plaintext_file:
         print("ErrCiphertextOrPlaintextFileNotFound")
         return
+    parts = ciphertext_b64.split(':::')
+    if len(parts) != 5:
+        raise ValueError("无效的加密数据格式")
+    lkid, encrypted_aes_key, nonce_b64, tag_b64, ciphertext_b64 = parts
+    key_data = load_key(lkid=lkid)
+    priv_encrypted = key_data.get("priv_encrypted", False)
+    priv_key = key_data.get("priv_key", "")
+    if key_data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
+        print(key_data)
+        return
+    if priv_encrypted:
+        password = input("Passphrase for private key:").strip()
+        password = text_to_base64(password)
+        try:
+            priv_key = aes_decrypt(priv_key, password)
+            if not priv_key:
+                print("ErrPrivkeyNotFound")
+                return
+
+        except Exception as e:
+            print("Err, password may be incorrect.")
+            return
     try:
-        plaintext = ling_decrypt(ciphertext_b64, priv_key)
+        plaintext = ling_decrypt(encrypted_aes_key, nonce_b64, tag_b64, ciphertext_b64, privkey_str=priv_key)
         print("Decryption result:")
         print(plaintext)
         with open(plaintext_file, "wb") as f:
