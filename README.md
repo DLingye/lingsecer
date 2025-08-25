@@ -1,80 +1,68 @@
-# LingSecer 安全文件加密系统
+# LingSecer - 安全加密工具
 
-## 项目简介
-LingSecer 是一个基于Python的安全文件加密系统，采用RSA+AES混合加密算法，提供完整的密钥管理、文件加密解密功能。
+## 功能概述
 
-**版本**: 250809  
-**作者**: DONGFANG Lingye  
-**邮箱**: ly@lingye.online
-
-## 功能特性
-- 安全的混合加密方案(RSA+AES)
-- 完整的密钥生命周期管理
-- 本地密钥存储和管理
-- 文件加密/解密功能
-- 数据压缩传输
-- 时间戳和完整性验证
-
-## 模块说明
-| 模块 | 功能 |
-|------|------|
-| lingsecer.py | 主程序，提供用户界面 |
-| lingsecer_seed.py | 加密种子生成 |
-| lingsecer_genkey.py | RSA密钥对生成 |
-| lingsecer_encrypt.py | 文件加密/解密核心 |
-| lingsecer_localkey.py | 本地密钥管理 |
-| lingsecer_todata.py | 数据格式转换 |
-| lingsecer_gettime.py | 时间信息获取 |
-| lingsecer_compress.py | 数据压缩/解压 |
-
-## 安装和使用
-### 依赖安装
-```bash
-pip install pycryptodome
-```
-
-### 基本使用
-1. 生成密钥:
-```bash
-genkey
-```
-
-2. 加密文件:
-```bash
-encrypt
-```
-
-3. 解密文件:
-```bash
-decrypt
-```
-
-## 加密原理
-1. 使用RSA-4096加密随机生成的AES密钥
-2. 使用AES-256(GCM模式)加密文件内容
-3. 压缩加密后的数据
-4. 添加时间戳和完整性校验
-
-## 示例
-### 生成密钥
-```
-Name (default user): 
-Email: user@example.com
-Comment: test key
-Seed phrase: (可选)
-Key strength (1-64, default 64): 
-RSA Key strength (default 4096): 
-```
-
-### 加密文件
-```
-Input lkid: (可选)
-File to encrypt: test.txt
-```
+LingSecer 是一个安全加密工具，提供密钥生成、文件加密/解密、密钥管理等功能。
+开发版本python 3.13.5
 
 ## 依赖
-- Python 3.6+
-- pycryptodome
 
-## 许可证
-本项目采用GPL v3 许可证。
+```bash
+- pycryptodome
+- zstandard
+```
+
+## 命令列表
+
+### 基本命令
+- `genkey`: 生成新的密钥对
+- `encrypt`: 加密文件
+- `decrypt`: 解密文件
+- `quit/exit`: 退出程序
+
+### 密钥管理命令
+- `importkey`: 导入密钥
+- `listkey`: 列出所有密钥
+- `delkey`: 删除密钥
+- `exportkey`: 导出密钥
+
+## 导出密钥命令
+
+### 功能
+导出公钥或私钥到.lsk文件
+
+### 语法
+```
+exportkey [pub/priv] [lkid/lkid_short/name]
+```
+
+### 参数
+- `pub`: 仅导出公钥
+- `priv`: 导出公钥和私钥
+- `lkid`: 密钥完整ID (64字符)
+- `lkid_short`: 密钥简短ID (16字符)
+- `name`: 密钥名称
+
+### 示例
+1. 导出公钥:
+```
+lingsecer> exportkey pub mykey
+```
+
+2. 导出私钥:
+```
+lingsecer> exportkey priv 1234567890abcdef
+```
+
+## 使用示例
+
+```bash
+python lingsecer.py
+lingsecer> genkey
+lingsecer> listkey
+lingsecer> exportkey pub mykey
+```
+
+## 作者
+
+DONGFANG Lingye <ly@lingye.online>

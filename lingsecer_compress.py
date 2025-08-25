@@ -1,10 +1,12 @@
-MAINAME = "LingSecer_Compress"
-VERSION = "250812"
-AUTHOR = "DONGFANG Lingye"
-EMAIL = "ly@lingye.online"
-
 import zstandard as zstd
 import base64
+
+import lingsecer_metadata
+
+MAINAME = lingsecer_metadata.MAINAME
+VERSION = lingsecer_metadata.VERSION
+AUTHOR = lingsecer_metadata.AUTHOR
+EMAIL = lingsecer_metadata.EMAIL
 
 def compress_data(data_str):
     """使用zstd格式进行极限压缩"""

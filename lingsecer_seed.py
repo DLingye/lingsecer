@@ -1,10 +1,12 @@
-MAINAME = "LingSecer_Seed"
-VERSION = "250812"
-AUTHOR = "DONGFANG Lingye"
-EMAIL = "ly@lingye.online"
-
 import hashlib
 import base64
+
+import lingsecer_metadata
+
+MAINAME = lingsecer_metadata.MAINAME
+VERSION = lingsecer_metadata.VERSION
+AUTHOR = lingsecer_metadata.AUTHOR
+EMAIL = lingsecer_metadata.EMAIL
 
 class ErrParamFormat(Exception):
     pass

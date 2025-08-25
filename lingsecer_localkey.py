@@ -1,11 +1,12 @@
-MAINAME = "LingSecer_LocalKey"
-VERSION = "250812"
-AUTHOR = "DONGFANG Lingye"
-EMAIL = "ly@lingye.online"
-
 import os
 import json
 
+import lingsecer_metadata
+
+MAINAME = lingsecer_metadata.MAINAME
+VERSION = lingsecer_metadata.VERSION
+AUTHOR = lingsecer_metadata.AUTHOR
+EMAIL = lingsecer_metadata.EMAIL
 LOCAL_KEY_FILE = "lingsecer_localkey.json"
 
 def import_key(key_data):
@@ -101,3 +102,40 @@ def load_key(lkid="", lkid_short="", name=""):
            (name and key_name == name):
             return key
     return "ErrNoMatchKey"
+
+def export_key(mode, identifier):
+    """Export key to .lsk file
+    Args:mode: 'pub' or 'priv'
+         identifier: lkid, lkid_short or name
+    Returns:str: filename if success, error message if failed"""
+    key_data = load_key(lkid=identifier if len(identifier) == 64 else "",
+                       lkid_short=identifier if len(identifier) == 16 else "",
+                       name=identifier)
+    if isinstance(key_data, str):  # error message
+        return key_data
+    
+    lkid_short = key_data.get('lkid', '')[:8] + key_data.get('lkid', '')[-8:]
+    filename = f"{lkid_short}.lsk"
+    
+    export_data = {
+        "version": VERSION,
+        "lkid": key_data.get('lkid', ''),
+        "name": key_data.get('name', ''),
+        "email": key_data.get('email', ''),
+        "comment": key_data.get('comment', ''),
+        "mode": key_data.get('mode', ''),
+        "time": key_data.get('time', ''),
+        "key_length": key_data.get('key_length', ''),
+        "pub_key": key_data.get('pub_key', '')
+    }
+    
+    if mode == 'priv':
+        export_data["priv_encrypted"] = key_data.get('priv_encrypted', False)
+        export_data["priv_key"] = key_data.get('priv_key', '')
+    
+    try:
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(export_data, f, ensure_ascii=False, indent=4)
+        return filename
+    except Exception as e:
+        return f"ErrExportFailed: {str(e)}"

@@ -1,11 +1,13 @@
-MAINAME = "LingSecer_toData"
-VERSION = "250812"
-AUTHOR = "DONGFANG Lingye"
-EMAIL = "ly@lingye.online"
-
 import hashlib
 import json
 import datetime, time
+
+import lingsecer_metadata
+
+MAINAME = lingsecer_metadata.MAINAME
+VERSION = lingsecer_metadata.VERSION
+AUTHOR = lingsecer_metadata.AUTHOR
+EMAIL = lingsecer_metadata.EMAIL
 
 l_time = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
 timezone = time.strftime('%Z', time.localtime())

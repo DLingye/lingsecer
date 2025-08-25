@@ -1,8 +1,3 @@
-MAINAME = "LingSecer"
-VERSION = "250820"
-AUTHOR = "DONGFANG Lingye"
-EMAIL = "ly@lingye.online"
-
 import os
 import json
 import base64
@@ -13,9 +8,15 @@ import datetime, time
 from lingsecer_seed import gen_seed
 from lingsecer_genkey import ling_genkey
 from lingsecer_encrypt import ling_encrypt, ling_decrypt
-from lingsecer_localkey import import_key, list_key, del_key, load_key
+from lingsecer_localkey import import_key, list_key, del_key, load_key, export_key
 from lingsecer_todata import key_to_json
 from lingsecer_compress import compress_data, decompress_data
+import lingsecer_metadata
+
+MAINAME = lingsecer_metadata.MAINAME
+VERSION = lingsecer_metadata.VERSION
+AUTHOR = lingsecer_metadata.AUTHOR
+EMAIL = lingsecer_metadata.EMAIL
 
 l_time = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
 timezone = time.strftime('%Z', time.localtime())
@@ -116,8 +117,8 @@ def gen_key():
         print("ErrKeyAlreadyExists")
     else:
         output = out[0]
-        print(str(output[0])+" "+output[1]+"\n"+output[2]+" "+str(output[7])+"\n"+output[3]+" <"+output[4]+"> "
-              +" "+output[5]+"\n"+output[6])
+        print(str(output[0])+". "+output[1]+"\n"+output[2]+" "+str(output[7])+"\n"+output[3]+" <"+output[4]+"> "
+              +"\n"+output[6]+"\n"+output[5])
 
 def decrypt_key():
     json_filename = input("File to decrypt (leave empty to use local key):").strip()
@@ -156,7 +157,7 @@ def encrypt_file():
     if len(key_identifier) == 64:
         data = load_key(lkid=key_identifier)
         if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
-            if len(key_identifier) == 8:
+            if len(key_identifier) == 16:
                 data = load_key(lkid_short=key_identifier)
                 if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
                     data = load_key(name=key_identifier)
@@ -232,15 +233,21 @@ def decrypt_file():
 def local_key(command):
     if command == "import":
         key_file = input("Import from:").strip()
-        out=import_key(key_file)
+        if os.path.isfile(key_file):
+            with open(key_file, "r", encoding="utf-8") as f:
+                key_data = json.load(f)
+        else:
+            print("ErrFileNotFound")
+            return
+        out=import_key(key_data)
         if out == "ErrFileNotFound":
             return "ErrFileNotFound"
         elif out == "ErrKeyAlreadyExists":
             return "ErrKeyAlreadyExists"
         else:
             output=out[0]
-            print(str(output[0])+" "+output[1]+"\n"+output[2]+"\n"+output[3]+" <"+output[4]+"> "
-                  +" "+output[5]+"\n"+output[6])
+            print(str(output[0])+". "+output[1]+"\n"+output[2]+"\n"+output[3]+" <"+output[4]+"> "
+                  +"\n"+output[6]+"\n"+output[5])
     elif command == "list":
         out=list_key()
         if out == "NoLocalKeyFile":
@@ -252,13 +259,20 @@ def local_key(command):
         else:
             result = []
             for output in out:
-                print(str(output[0])+" "+output[1]+"\n"+output[2]+"\n"+output[3]+" <"+output[4]+"> "
-                      +" "+output[5]+"\n"+output[6])
+                print(str(output[0])+". "+output[1]+"\n"+output[2]+"\n"+output[3]+" <"+output[4]+"> "
+                      +"\n"+output[6]+"\n"+output[5])
     elif command == "del":
-        lkid = input("Delete by lkid (default skip):").strip()
-        lkid_short = input("Delete by lkid_short (default skip):").strip()
-        name = input("Delete by name:").strip()
-        out=del_key(lkid=lkid, lkid_short=lkid_short, name=name)
+        key_identifier = input("Input key identifier (lkid/lkid_short/name):").strip()
+        if not key_identifier:
+            print("Key identifier cannot be empty")
+            return
+        elif len(key_identifier) == 64:
+            out=del_key(lkid=key_identifier)
+        elif len(key_identifier) == 16:
+            out=del_key(lkid_short=key_identifier)
+        else:
+            out=del_key(name=key_identifier)
+        
         if out == "NoLocalKeyFile":
             return "NoLocalKeyFile"
         elif out == "NoLocalKey":
@@ -266,9 +280,26 @@ def local_key(command):
         elif out == "ErrNoMatchKey":
             return "ErrNoMatchKey"
         elif out == 0:
-            return "OK."
+            print("OK.")
     else:
         return "ErrBadCommand"
+    
+def exportkey(cmd):
+    parts = cmd.split()
+    if len(parts) != 3:
+        print("Usage: outkey [pub/priv] [lkid/lkid_short/name]")
+        return
+    elif len(parts) == 3:
+        mode = parts[1]
+        identifier = parts[2]
+        if mode not in ("pub", "priv"):
+            print("ErrBadMode: must be 'pub' or 'priv'")
+            return
+    result = export_key(mode, identifier)
+    if result.startswith("Err"):
+        print(result)
+    else:
+        print(f"OK. Key exported to {result}")
 
 
 def main():
@@ -290,6 +321,11 @@ def main():
             local_key("list")
         elif cmd == "delkey":
             local_key("del")
+        elif cmd.startswith("exportkey"):
+            exportkey(cmd)
+        elif cmd == "ling":
+            import ling
+            ling.main()
         else:
             print("ErrCommandNotFound")
 

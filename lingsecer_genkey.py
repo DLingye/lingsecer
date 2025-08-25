@@ -1,10 +1,12 @@
-MAINAME = "LingSecer_GenKey"
-VERSION = "250812"
-AUTHOR = "DONGFANG Lingye"
-EMAIL = "ly@lingye.online"
-
 from Crypto.PublicKey import RSA
 from hashlib import sha512
+
+import lingsecer_metadata
+
+MAINAME = lingsecer_metadata.MAINAME
+VERSION = lingsecer_metadata.VERSION
+AUTHOR = lingsecer_metadata.AUTHOR
+EMAIL = lingsecer_metadata.EMAIL
 
 def deterministic_randfunc(seed):
     # 生成一个确定性的伪随机字节流
