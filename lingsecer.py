@@ -5,7 +5,7 @@ from Crypto.Cipher import AES
 import hashlib
 import datetime, time
 
-from lingsecer_seed import gen_seed
+#from lingsecer_seed import gen_seed
 from lingsecer_genkey import ling_genkey
 from lingsecer_encrypt import ling_encrypt, ling_decrypt
 from lingsecer_localkey import import_key, list_key, del_key, load_key, export_key
@@ -77,28 +77,19 @@ def gen_key():
         owner_name = username
     owner_mail = input("Email:").strip()
     comment = input("Comment:").strip()
-    phrase = input("Seed phrase:").strip()
-    strength = input("Key strength (1-64, default 64):").strip()
-    key_strength = input("RSA Key strength (default 4096):").strip()
-    if not key_strength.isdigit() or not (1024 <= int(key_strength) <= 16384) or key_strength == "":
-        key_strength = "4096"
-    key_strength = int(key_strength)
-    if not strength.isdigit() or not (1 <= int(strength) <= 64) or strength == "":
-        strength = "64"
-    if phrase == "": # 留空则生成随机密钥
-        priv, pub = ling_genkey(None, key_strength)
-        print("Private_Key:")
-        print(priv)
-        print("Public_Key:")
-        print(pub)
-    else:
-        ins = phrase + " " + "2-" + strength
-        result = gen_seed(ins)
-        priv, pub = ling_genkey(result[-2], key_strength)
-        print("Private_Key:")
-        print(priv)
-        print("Public_Key:")
-        print(pub)
+
+    #phrase = input("Seed phrase:").strip()
+    #strength = input("Key strength (1-64, default 64):").strip()
+    #key_strength = input("RSA Key strength (default 4096):").strip()
+    #if not key_strength.isdigit() or not (1024 <= int(key_strength) <= 16384) or key_strength == "":
+    #    key_strength = "4096"
+
+    priv, pub = ling_genkey(None,None)
+    #print("Private_Key:")
+    #print(priv)
+    #print("Public_Key:")
+    #print(pub)
+    
     password = input("Passphrase (leave empty for no encryption):").strip()
     if password:
         password = text_to_base64(password)
@@ -106,9 +97,9 @@ def gen_key():
         priv_encrypted = True
     else:
         priv_encrypted = False
-    j_data = key_to_json(owner_name, owner_mail, comment, mode='encrypt', 
+    j_data = key_to_json(owner_name, owner_mail, comment, algo="cv25519", mode='encrypt', 
            time=timezone+'_'+l_time, priv_encrypted=priv_encrypted, 
-           pub_key=pub, priv_key=priv, key_length=key_strength)
+           pub_key=pub, priv_key=priv, key_length=256)
     # 直接导入密钥库
     out = import_key(j_data)
     if out == "ErrFileNotFound":
@@ -221,7 +212,7 @@ def decrypt_file():
             print("Err, password may be incorrect.")
             return
     try:
-        plaintext = ling_decrypt(encrypted_aes_key, nonce_b64, tag_b64, ciphertext_b64, privkey_str=priv_key)
+        plaintext = ling_decrypt(encrypted_aes_key, nonce_b64, tag_b64, ciphertext_b64, privkey_b85=priv_key)
         print("Decryption result:")
         print(plaintext)
         with open(plaintext_file, "wb") as f:
@@ -246,8 +237,8 @@ def local_key(command):
             return "ErrKeyAlreadyExists"
         else:
             output=out[0]
-            print(str(output[0])+". "+output[1]+"\n"+output[2]+"\n"+output[3]+" <"+output[4]+"> "
-                  +"\n"+output[6]+"\n"+output[5])
+            print(str(output[0])+". "+output[1]+"\n"+output[2]+" "+str(output[7])+"\n"+output[3]+" <"+output[4]+"> "
+              +"\n"+output[6]+"\n"+output[5])
     elif command == "list":
         out=list_key()
         if out == "NoLocalKeyFile":
@@ -259,8 +250,8 @@ def local_key(command):
         else:
             result = []
             for output in out:
-                print(str(output[0])+". "+output[1]+"\n"+output[2]+"\n"+output[3]+" <"+output[4]+"> "
-                      +"\n"+output[6]+"\n"+output[5])
+                print(str(output[0])+". "+output[1]+"\n"+output[2]+" "+str(output[7])+"\n"+output[3]+" <"+output[4]+"> "
+              +"\n"+output[6]+"\n"+output[5])
     elif command == "del":
         key_identifier = input("Input key identifier (lkid/lkid_short/name):").strip()
         if not key_identifier:

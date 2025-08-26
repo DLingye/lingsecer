@@ -1,5 +1,5 @@
-from Crypto.PublicKey import RSA
-from hashlib import sha512
+from nacl.public import PrivateKey
+import base64
 
 import lingsecer_metadata
 
@@ -8,28 +8,19 @@ VERSION = lingsecer_metadata.VERSION
 AUTHOR = lingsecer_metadata.AUTHOR
 EMAIL = lingsecer_metadata.EMAIL
 
-def deterministic_randfunc(seed):
-    # 生成一个确定性的伪随机字节流
-    counter = [0]
-    def randfunc(n):
-        data = b''
-        while len(data) < n:
-            counter_bytes = counter[0].to_bytes(8, 'big')
-            data += sha512(seed + counter_bytes).digest()
-            counter[0] += 1
-        return data[:n]
-    return randfunc
+def deterministic_cv25519_key():
+    # 生成 cv25519 (X25519) 私钥
+    sk = PrivateKey.generate()
+    pk = sk.public_key
 
-def deterministic_rsa_key(seed_str=None, key_size=4096):
-    if not seed_str:
-        # 无种子时，使用系统随机源
-        key = RSA.generate(key_size)
-    else:
-        seed = sha512(seed_str.encode('utf-8')).digest()
-        randfunc = deterministic_randfunc(seed)
-        key = RSA.generate(key_size, randfunc=randfunc)
-    return key.export_key(), key.publickey().export_key()
+    sk_raw = bytes(sk)   # 32 字节
+    pk_raw = bytes(pk)   # 32 字节
 
-def ling_genkey(seed_str=None, key_size=4096):
-    priv_key, pub_key = deterministic_rsa_key(seed_str, key_size)
-    return priv_key.decode(), pub_key.decode()
+    return sk_raw, pk_raw
+
+def ling_genkey(algo=None, key_length=None):
+    priv_key, pub_key = deterministic_cv25519_key()
+    # 使用 Base85 编码输出，latin1 保证可逆
+    priv_b85 = base64.b85encode(priv_key).decode("latin1")
+    pub_b85 = base64.b85encode(pub_key).decode("latin1")
+    return priv_b85, pub_b85

@@ -56,9 +56,10 @@ def list_key(lkid="", lkid_short="", name=""):
         key_email = key.get('email', '')
         key_comment = key.get('comment', '')
         key_date = key.get('time', '')
-        key_length = key.get('key_length', '')
+        #key_length = key.get('key_length', '')
+        key_algo = key.get('algo', '')
         key_lkid_short = key_lkid[:8] + key_lkid[-8:] if len(key_lkid) >= 16 else key_lkid
-        result.append((idx, key_lkid, key_lkid_short, key_name, key_email, key_comment, key_date, key_length))
+        result.append((idx, key_lkid, key_lkid_short, key_name, key_email, key_comment, key_date, key_algo))
     return result
 
 #通过指定的lkid或lkid_short或name删除密钥
@@ -125,7 +126,7 @@ def export_key(mode, identifier):
         "comment": key_data.get('comment', ''),
         "mode": key_data.get('mode', ''),
         "time": key_data.get('time', ''),
-        "key_length": key_data.get('key_length', ''),
+        "key_length": "256",  # cv25519固定为256位
         "pub_key": key_data.get('pub_key', '')
     }
     

@@ -1,6 +1,6 @@
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP, AES
+from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
+from nacl.public import PrivateKey, PublicKey, SealedBox
 import base64
 
 import lingsecer_metadata
@@ -10,49 +10,54 @@ VERSION = lingsecer_metadata.VERSION
 AUTHOR = lingsecer_metadata.AUTHOR
 EMAIL = lingsecer_metadata.EMAIL
 
-def encrypt_with_public_key(plaintext, pubkey_str):
-    pubkey = RSA.import_key(pubkey_str)
-    cipher = PKCS1_OAEP.new(pubkey)
-    ciphertext = cipher.encrypt(plaintext.encode('utf-8'))
-    return base64.b85encode(ciphertext).decode('utf-8')
 
-def decrypt_with_private_key(ciphertext_b64, privkey_str):
-    try:
-        privkey = RSA.import_key(privkey_str)
-        cipher = PKCS1_OAEP.new(privkey)
-        ciphertext = base64.b85decode(ciphertext_b64.encode('utf-8'))
-        sentinel = b'error'
-        plaintext = cipher.decrypt(ciphertext)
-        if plaintext == sentinel:
-            raise ValueError("解密失败，私钥不匹配或数据损坏")
-        return plaintext.decode('utf-8')
-    except ValueError as e:
-        raise ValueError(f"无效的RSA私钥格式: {str(e)}")
-    except Exception as e:
-        raise ValueError(f"解密失败: {str(e)}")
+def encrypt_with_public_key(plaintext: bytes, pubkey_b85: str) -> str:
+    """用 cv25519 公钥加密数据 (SealedBox)，返回 Base85"""
+    pubkey_raw = base64.b85decode(pubkey_b85.encode("utf-8"))
+    pubkey = PublicKey(pubkey_raw)
+    encrypt_box = SealedBox(pubkey)
+    ciphertext = encrypt_box.encrypt(plaintext)
+    return base64.b85encode(ciphertext).decode("utf-8")
 
-def ling_encrypt(file_data, pubkey_str, lkid):
+
+def decrypt_with_private_key(ciphertext_b85: str, privkey_b85: str) -> bytes:
+    """用 cv25519 私钥解密数据 (SealedBox)，返回原始字节"""
+    privkey_raw = base64.b85decode(privkey_b85.encode("utf-8"))
+    privkey = PrivateKey(privkey_raw)
+    decrypt_box = SealedBox(privkey)
+    ciphertext = base64.b85decode(ciphertext_b85.encode("utf-8"))
+    plaintext = decrypt_box.decrypt(ciphertext)
+    return plaintext
+
+
+def ling_encrypt(file_data: bytes, pubkey_b85: str, lkid: str) -> str:
+    """主加密函数：AES-GCM + cv25519 封装的 AES key"""
     # 生成随机的256位(32字节)AES密钥
     aes_key = get_random_bytes(32)
-    # 使用AES-256加密文件内容
+
+    # 使用AES-256-GCM加密文件内容
     cipher = AES.new(aes_key, AES.MODE_GCM)
-    ciphertext, tag = cipher.encrypt_and_digest(file_data)  # 直接处理二进制数据
-    # 使用RSA公钥加密AES密钥
-    encrypted_aes_key = encrypt_with_public_key(base64.b85encode(aes_key).decode('utf-8'), pubkey_str)
-    # 组合加密后的数据：encrypted_aes_key:::nonce:::tag:::ciphertext
-    return f"{lkid}:::{encrypted_aes_key}:::{base64.b85encode(cipher.nonce).decode('utf-8')}:::{base64.b85encode(tag).decode('utf-8')}:::{base64.b85encode(ciphertext).decode('utf-8')}"
+    ciphertext, tag = cipher.encrypt_and_digest(file_data)
+
+    # 使用cv25519公钥加密AES密钥（AES密钥先直接加密，不需要再转base85）
+    encrypted_aes_key = encrypt_with_public_key(aes_key, pubkey_b85)
+
+    # 拼接加密后的数据
+    return f"{lkid}:::{encrypted_aes_key}:::{base64.b85encode(cipher.nonce).decode()}:::{base64.b85encode(tag).decode()}:::{base64.b85encode(ciphertext).decode()}"
 
 
-def ling_decrypt(encrypted_aes_key, nonce_b64, tag_b64, ciphertext_b64, privkey_str):
-    # 使用RSA私钥解密AES密钥
-    aes_key_b64 = decrypt_with_private_key(encrypted_aes_key, privkey_str)
-    aes_key = base64.b85decode(aes_key_b64)
-    nonce = base64.b85decode(nonce_b64)
-    tag = base64.b85decode(tag_b64)
-    ciphertext = base64.b85decode(ciphertext_b64)
+def ling_decrypt(encrypted_aes_key_b85: str, nonce_b85: str, tag_b85: str,
+                 ciphertext_b85: str, privkey_b85: str) -> bytes:
+    """解密函数：还原AES密钥 -> 解密文件内容"""
+    # 解密AES密钥
+    aes_key = decrypt_with_private_key(encrypted_aes_key_b85, privkey_b85)
+
+    # 解码各部分
+    nonce = base64.b85decode(nonce_b85.encode("utf-8"))
+    tag = base64.b85decode(tag_b85.encode("utf-8"))
+    ciphertext = base64.b85decode(ciphertext_b85.encode("utf-8"))
+
     # 使用AES解密文件内容
     cipher = AES.new(aes_key, AES.MODE_GCM, nonce=nonce)
     decrypted_data = cipher.decrypt_and_verify(ciphertext, tag)
-    return decrypted_data  # 直接返回二进制数据
-
-
+    return decrypted_data

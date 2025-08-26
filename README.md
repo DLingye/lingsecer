@@ -8,9 +8,14 @@ LingSecer 是一个安全加密工具，提供密钥生成、文件加密/解密
 ## 依赖
 
 ```bash
+- cryptography
 - pycryptodome
 - zstandard
 ```
+
+## 算法说明
+
+使用cv25519进行密钥交换，AES-256-GCM进行数据加密
 
 ## 命令列表
 
