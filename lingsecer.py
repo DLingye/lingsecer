@@ -11,6 +11,7 @@ from lingsecer_encrypt import ling_encrypt, ling_decrypt
 from lingsecer_localkey import import_key, list_key, del_key, load_key, export_key
 from lingsecer_todata import key_to_json
 from lingsecer_compress import compress_data, decompress_data
+from lingsecer_sign import ling_sign, ling_vsign
 import lingsecer_metadata
 
 MAINAME = lingsecer_metadata.MAINAME
@@ -71,6 +72,8 @@ def text_to_base64(s):
     return base64.b64encode(sha256).decode('utf-8')
 
 def gen_key():
+    encrypt_algo = "cv25519"
+    sign_algo = "ed25519"
     username = os.getlogin()
     owner_name = input("Name (default {}):".format(username)).strip()
     if owner_name == "":
@@ -84,22 +87,21 @@ def gen_key():
     #if not key_strength.isdigit() or not (1024 <= int(key_strength) <= 16384) or key_strength == "":
     #    key_strength = "4096"
 
-    priv, pub = ling_genkey(None,None)
-    #print("Private_Key:")
-    #print(priv)
-    #print("Public_Key:")
-    #print(pub)
+    key_pairs = ling_genkey(None,None)
+    cv_priv, cv_pub = key_pairs["cv25519"]
+    ed_priv, ed_pub = key_pairs["ed25519"]
     
     password = input("Passphrase (leave empty for no encryption):").strip()
     if password:
         password = text_to_base64(password)
-        priv = aes_encrypt(priv, password)
+        cv_priv = aes_encrypt(cv_priv, password)
+        ed_priv = aes_encrypt(ed_priv, password)
         priv_encrypted = True
     else:
         priv_encrypted = False
-    j_data = key_to_json(owner_name, owner_mail, comment, algo="cv25519", mode='encrypt', 
+    j_data = key_to_json(owner_name, owner_mail, comment, encrypt_algo=encrypt_algo, sign_algo=sign_algo, mode='encrypt sign',
            time=timezone+'_'+l_time, priv_encrypted=priv_encrypted, 
-           pub_key=pub, priv_key=priv, key_length=256)
+           pub_key=cv_pub, priv_key=cv_priv, pub_sign=ed_pub, priv_sign=ed_priv, encrypt_key_length=256, sign_key_length=256)
     # 直接导入密钥库
     out = import_key(j_data)
     if out == "ErrFileNotFound":
@@ -292,6 +294,67 @@ def exportkey(cmd):
     else:
         print(f"OK. Key exported to {result}")
 
+def sign_file():
+    """处理签名命令"""
+    key_identifier = input("Input key identifier (lkid/lkid_short/name):").strip()
+    data = None
+    if len(key_identifier) == 64:
+        data = load_key(lkid=key_identifier)
+    elif len(key_identifier) == 16:
+        data = load_key(lkid_short=key_identifier)
+    else:
+        data = load_key(name=key_identifier)
+    if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
+        print(data)
+        return
+    if not data:
+        print("No key found.")
+        return
+    
+    lkid = data.get("lkid", "")
+    priv_encrypted = data.get("priv_encrypted", False)
+    priv_key = data.get("priv_sign", "")
+    if priv_encrypted:
+        password = input("Passphrase for private key:").strip()
+        password = text_to_base64(password)
+        try:
+            priv_key = aes_decrypt(priv_key, password)
+        except:
+            print("ErrBadPassphrase")
+            return
+    
+    from pathlib import Path
+    filename = input("File to sign:").strip()
+    file_path = Path(filename)
+    file_data = file_path.read_bytes()
+    try:
+        sign_data = ling_sign(filename, file_data, lkid, priv_key)
+        # 写入签名文件
+        sign_filename = filename + "_sign.lssd"
+        with open(sign_filename, "w", encoding="utf-8") as f:
+            json.dump(sign_data, f, ensure_ascii=False, indent=2)
+        print(f"Signature saved to: {sign_filename}")
+    except Exception as e:
+        print(f"ErrSignFailed: {str(e)}")
+
+def verify_sign():
+    """处理验证签名命令"""
+    filename = input("File to verify:").strip()
+    if not filename:
+        print("File cannot be empty")
+        return
+    from pathlib import Path
+    file_path = Path(filename)
+    data = file_path.read_bytes()
+    
+    try:
+        valid, name = ling_vsign(data, filename)
+        if valid:
+            print(f"Good Signature from {name}")
+        else:
+            print(f"Signature verification failed")
+    except Exception as e:
+        print(f"ErrVerifyFailed: {str(e)}")
 
 def main():
     print(MAINAME+" Ver "+VERSION)
@@ -306,14 +369,18 @@ def main():
             encrypt_file()
         elif cmd == "decrypt":
             decrypt_file()
-        elif cmd == "importkey":
+        elif cmd == "import":
             local_key("import")
-        elif cmd == "listkey":
+        elif cmd == "list":
             local_key("list")
-        elif cmd == "delkey":
+        elif cmd == "del":
             local_key("del")
-        elif cmd.startswith("exportkey"):
+        elif cmd.startswith("export"):
             exportkey(cmd)
+        elif cmd == "sign":
+            sign_file()
+        elif cmd == "vsign":
+            verify_sign()
         elif cmd == "ling":
             import ling
             ling.main()

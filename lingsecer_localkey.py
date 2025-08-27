@@ -126,14 +126,18 @@ def export_key(mode, identifier):
         "comment": key_data.get('comment', ''),
         "mode": key_data.get('mode', ''),
         "time": key_data.get('time', ''),
+        "encrypt_algo": "cv25519",  # 固定为cv25519
+        "sign_algo": "ed25519",  # 固定为ed25519
         "key_length": "256",  # cv25519固定为256位
-        "pub_key": key_data.get('pub_key', '')
+        "pub_key": key_data.get('pub_key', ''),
+        "pub_sign": key_data.get('pub_sign', '')
     }
     
     if mode == 'priv':
         export_data["priv_encrypted"] = key_data.get('priv_encrypted', False)
         export_data["priv_key"] = key_data.get('priv_key', '')
-    
+        export_data["priv_sign"] = key_data.get('priv_sign', '')
+
     try:
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(export_data, f, ensure_ascii=False, indent=4)
