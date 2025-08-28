@@ -5,13 +5,13 @@ from Crypto.Cipher import AES
 import hashlib
 import datetime, time
 
-#from lingsecer_seed import gen_seed
-from lingsecer_genkey import ling_genkey
 from lingsecer_encrypt import ling_encrypt, ling_decrypt
 from lingsecer_localkey import import_key, list_key, del_key, load_key, export_key
 from lingsecer_todata import key_to_json
 from lingsecer_compress import compress_data, decompress_data
 from lingsecer_sign import ling_sign, ling_vsign
+from lingsecer_cv25519 import gen_cv25519
+from lingsecer_ed25519 import gen_ed25519
 import lingsecer_metadata
 
 MAINAME = lingsecer_metadata.MAINAME
@@ -71,23 +71,45 @@ def text_to_base64(s):
     sha256 = hashlib.sha256(s.encode('utf-8')).digest()
     return base64.b64encode(sha256).decode('utf-8')
 
+def ling_genkey(crypt_algo:str=None, sign_algo:str=None, key_length:int=None) -> dict:
+    result = {}
+    
+    if crypt_algo is None or crypt_algo == "cv25519":
+        cv_priv_b85, cv_pub_b85 = gen_cv25519(True)
+        result["cv25519"] = (cv_priv_b85, cv_pub_b85)
+    
+    if sign_algo is None or sign_algo == "ed25519":
+        ed_priv_b85, ed_pub_b85 = gen_ed25519(True)
+        result["ed25519"] = (ed_priv_b85, ed_pub_b85)
+    
+    return result
+
 def gen_key():
-    encrypt_algo = "cv25519"
-    sign_algo = "ed25519"
+    from lingsecer_metadata import (
+        CRYPT_ALGO,
+        SIGN_ALGO
+    )
+    # 加密算法选择
+    print("\n可用的加密算法:")
+    for i, algo in enumerate(CRYPT_ALGO, 1):
+        print(f"{i}. {algo}")
+    crypt_choice = input(f"选择加密算法 (1-{len(CRYPT_ALGO)}, 默认1): ").strip()
+    crypt_algo = CRYPT_ALGO[int(crypt_choice)-1] if crypt_choice else "cv25519"
+    # 签名算法选择
+    print("\n可用的签名算法:")
+    for i, algo in enumerate(SIGN_ALGO, 1):
+        print(f"{i}. {algo}")
+    sign_choice = input(f"选择签名算法 (1-{len(SIGN_ALGO)}, 默认1): ").strip()
+    sign_algo = SIGN_ALGO[int(sign_choice)-1] if sign_choice else "ed25519"
+
     username = os.getlogin()
-    owner_name = input("Name (default {}):".format(username)).strip()
+    owner_name = input("\nName (default {}):".format(username)).strip()
     if owner_name == "":
         owner_name = username
     owner_mail = input("Email:").strip()
     comment = input("Comment:").strip()
 
-    #phrase = input("Seed phrase:").strip()
-    #strength = input("Key strength (1-64, default 64):").strip()
-    #key_strength = input("RSA Key strength (default 4096):").strip()
-    #if not key_strength.isdigit() or not (1024 <= int(key_strength) <= 16384) or key_strength == "":
-    #    key_strength = "4096"
-
-    key_pairs = ling_genkey(None,None)
+    key_pairs = ling_genkey('cv25519', 'ed25519', None)
     cv_priv, cv_pub = key_pairs["cv25519"]
     ed_priv, ed_pub = key_pairs["ed25519"]
     
@@ -99,9 +121,9 @@ def gen_key():
         priv_encrypted = True
     else:
         priv_encrypted = False
-    j_data = key_to_json(owner_name, owner_mail, comment, encrypt_algo=encrypt_algo, sign_algo=sign_algo, mode='encrypt sign',
+    j_data = key_to_json(owner_name, owner_mail, comment, crypt_algo=crypt_algo, sign_algo=sign_algo, mode='encrypt sign',
            time=timezone+'_'+l_time, priv_encrypted=priv_encrypted, 
-           pub_key=cv_pub, priv_key=cv_priv, pub_sign=ed_pub, priv_sign=ed_priv, encrypt_key_length=256, sign_key_length=256)
+           pub_key=cv_pub, priv_key=cv_priv, pub_sign=ed_pub, priv_sign=ed_priv, crypt_key_length=256, sign_key_length=256)
     # 直接导入密钥库
     out = import_key(j_data)
     if out == "ErrFileNotFound":
@@ -110,8 +132,8 @@ def gen_key():
         print("ErrKeyAlreadyExists")
     else:
         output = out[0]
-        print(str(output[0])+". "+output[1]+"\n"+output[2]+" "+str(output[7])+"\n"+output[3]+" <"+output[4]+"> "
-              +"\n"+output[6]+"\n"+output[5])
+        #idx0, key_lkid1, key_lkid_short2, key_name3, key_email4, key_comment5, crypt_algo6, crypt_key_length7, sign_algo8, sign_key_length9, key_date10
+        print(str(output[0])+". "+output[1]+"\n"+output[2]+" "+output[6]+"_"+str(output[7])+":"+output[8]+"_"+str(output[9])+"\n"+output[10]+"\n"+output[3]+" <"+output[4]+"> "+"\n"+output[5])
 
 def decrypt_key():
     json_filename = input("File to decrypt (leave empty to use local key):").strip()
@@ -239,8 +261,8 @@ def local_key(command):
             return "ErrKeyAlreadyExists"
         else:
             output=out[0]
-            print(str(output[0])+". "+output[1]+"\n"+output[2]+" "+str(output[7])+"\n"+output[3]+" <"+output[4]+"> "
-              +"\n"+output[6]+"\n"+output[5])
+            #idx0, key_lkid1, key_lkid_short2, key_name3, key_email4, key_comment5, crypt_algo6, crypt_key_length7, sign_algo8, sign_key_length9, key_date10
+            print(str(output[0])+". "+output[1]+"\n"+output[2]+" "+output[6]+"_"+str(output[7])+":"+output[8]+"_"+str(output[9])+"\n"+output[10]+"\n"+output[3]+" <"+output[4]+"> "+"\n"+output[5])
     elif command == "list":
         out=list_key()
         if out == "NoLocalKeyFile":
@@ -252,8 +274,8 @@ def local_key(command):
         else:
             result = []
             for output in out:
-                print(str(output[0])+". "+output[1]+"\n"+output[2]+" "+str(output[7])+"\n"+output[3]+" <"+output[4]+"> "
-              +"\n"+output[6]+"\n"+output[5])
+                #idx0, key_lkid1, key_lkid_short2, key_name3, key_email4, key_comment5, crypt_algo6, crypt_key_length7, sign_algo8, sign_key_length9, key_date10
+                print(str(output[0])+". "+output[1]+"\n"+output[2]+" "+output[6]+"_"+str(output[7])+":"+output[8]+"_"+str(output[9])+"\n"+output[10]+"\n"+output[3]+" <"+output[4]+"> "+"\n"+output[5])
     elif command == "del":
         key_identifier = input("Input key identifier (lkid/lkid_short/name):").strip()
         if not key_identifier:

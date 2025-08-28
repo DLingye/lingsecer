@@ -12,8 +12,8 @@ EMAIL = lingsecer_metadata.EMAIL
 l_time = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
 timezone = time.strftime('%Z', time.localtime())
 
-def key_to_json(owner_name, owner_mail, comment, encrypt_algo, sign_algo, mode, time, priv_encrypted, 
-           pub_key, priv_key, pub_sign, priv_sign, encrypt_key_length, sign_key_length):
+def key_to_json(owner_name, owner_mail, comment, crypt_algo, sign_algo, mode, time, priv_encrypted, 
+           pub_key, priv_key, pub_sign, priv_sign, crypt_key_length, sign_key_length):
     #生成pub_key的SHA512作为唯一id,全部使用大写
     lkid = hashlib.sha512(pub_key.encode('utf-8')).hexdigest().upper()
     data = {
@@ -22,12 +22,12 @@ def key_to_json(owner_name, owner_mail, comment, encrypt_algo, sign_algo, mode, 
         "name": owner_name,
         "email": owner_mail,
         "comment": comment,
-        "encrypt_algo": encrypt_algo,
+        "crypt_algo": crypt_algo,
         "sign_algo": sign_algo,
         "mode": mode,
         "time": time,
         "priv_encrypted": priv_encrypted,
-        "encrypt_key_length": encrypt_key_length,
+        "crypt_key_length": crypt_key_length,
         "sign_key_length": sign_key_length,
         "pub_key": pub_key,
         "priv_key": priv_key,

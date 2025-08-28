@@ -56,10 +56,12 @@ def list_key(lkid="", lkid_short="", name=""):
         key_email = key.get('email', '')
         key_comment = key.get('comment', '')
         key_date = key.get('time', '')
-        #key_length = key.get('key_length', '')
-        key_algo = key.get('algo', '')
+        crypt_key_length = key.get('crypt_key_length', '')
+        sign_key_length = key.get('sign_key_length', '')
+        crypt_algo = key.get('crypt_algo', '')
+        sign_algo = key.get('sign_algo', '')
         key_lkid_short = key_lkid[:8] + key_lkid[-8:] if len(key_lkid) >= 16 else key_lkid
-        result.append((idx, key_lkid, key_lkid_short, key_name, key_email, key_comment, key_date, key_algo))
+        result.append((idx, key_lkid, key_lkid_short, key_name, key_email, key_comment, crypt_algo, crypt_key_length, sign_algo, sign_key_length, key_date))
     return result
 
 #通过指定的lkid或lkid_short或name删除密钥
@@ -126,9 +128,10 @@ def export_key(mode, identifier):
         "comment": key_data.get('comment', ''),
         "mode": key_data.get('mode', ''),
         "time": key_data.get('time', ''),
-        "encrypt_algo": "cv25519",  # 固定为cv25519
-        "sign_algo": "ed25519",  # 固定为ed25519
-        "key_length": "256",  # cv25519固定为256位
+        "crypt_algo": key_data.get('crypt_algo', ''),
+        "sign_algo": key_data.get('sign_algo', ''),
+        "crypt_key_length": key_data.get('crypt_key_length', ''),
+        "sign_key_length": key_data.get('sign_key_length', ''),
         "pub_key": key_data.get('pub_key', ''),
         "pub_sign": key_data.get('pub_sign', '')
     }
