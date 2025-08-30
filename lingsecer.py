@@ -4,6 +4,8 @@ import base64
 from Crypto.Cipher import AES
 import hashlib
 import datetime, time
+from pathlib import Path
+import argparse
 
 from lingsecer_encrypt import ling_encrypt, ling_decrypt
 from lingsecer_localkey import import_key, list_key, del_key, load_key, export_key
@@ -24,7 +26,7 @@ timezone = time.strftime('%Z', time.localtime())
 
 def encrypted_file_to_data(plaintext_file, ciphertext):
     output_json = plaintext_file + ".lsed"
-    time=timezone+'_'+l_time
+    time = timezone + '_' + l_time
     lfid = hashlib.sha512(ciphertext if isinstance(ciphertext, bytes) else ciphertext.encode('utf-8')).hexdigest().upper()
     out_data = {
         "version": VERSION,
@@ -36,52 +38,60 @@ def encrypted_file_to_data(plaintext_file, ciphertext):
     }
     json_str = json.dumps(out_data, ensure_ascii=False, indent=4)
     compressed = compress_data(json_str)
-    with open(output_json, "wb") as f:
-        f.write(compressed)
-    print("OK.")
+    try:
+        with open(output_json, "wb") as f:
+            f.write(compressed)
+        print("OK.")
+    except Exception as e:
+        print(f"Error saving encrypted data: {e}")
 
 def aes_encrypt(data, password):
-    key = password.encode('utf-8')
-    key = key[:32].ljust(32, b'\0')  # AES-256
-    cipher = AES.new(key, AES.MODE_GCM)
-    nonce = cipher.nonce  # 12字节随机IV
-    ct_bytes, tag = cipher.encrypt_and_digest(data.encode('utf-8'))
-    # 拼接 nonce + tag + ciphertext，均为base64编码后用“:”分隔，返回单一字符串
-    result = (
-        base64.b64encode(nonce).decode('utf-8') + ":" +
-        base64.b64encode(tag).decode('utf-8') + ":" +
-        base64.b64encode(ct_bytes).decode('utf-8')
-    )
-    return result
+    try:
+        key = password.encode('utf-8')
+        key = key[:32].ljust(32, b'\0')  # AES-256
+        cipher = AES.new(key, AES.MODE_GCM)
+        nonce = cipher.nonce  # 12 Bytes IV
+        ct_bytes, tag = cipher.encrypt_and_digest(data.encode('utf-8'))
+        result = (
+            base64.b64encode(nonce).decode('utf-8') + ":" +
+            base64.b64encode(tag).decode('utf-8') + ":" +
+            base64.b64encode(ct_bytes).decode('utf-8')
+        )
+        return result
+    except Exception as e:
+        print(f"Error during AES encryption: {e}")
+        return None
 
 def aes_decrypt(enc_data, password):
-    key = password.encode('utf-8')
-    key = key[:32].ljust(32, b'\0')
-    try: # 拆分字符串
+    try:
+        key = password.encode('utf-8')
+        key = key[:32].ljust(32, b'\0')
         nonce_b64, tag_b64, ct_b64 = enc_data.split(":")
         nonce = base64.b64decode(nonce_b64)
         tag = base64.b64decode(tag_b64)
         ct = base64.b64decode(ct_b64)
-    except Exception:
-        raise ValueError("ErrBadFormat")
-    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
-    return cipher.decrypt_and_verify(ct, tag).decode('utf-8')
+        cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+        return cipher.decrypt_and_verify(ct, tag).decode('utf-8')
+    except Exception as e:
+        print(f"Error during AES decryption: {e}")
+        return None
 
 def text_to_base64(s):
-    sha256 = hashlib.sha256(s.encode('utf-8')).digest()
-    return base64.b64encode(sha256).decode('utf-8')
+    try:
+        sha256 = hashlib.sha256(s.encode('utf-8')).digest()
+        return base64.b64encode(sha256).decode('utf-8')
+    except Exception as e:
+        print(f"Error in base64 encoding: {e}")
+        return None
 
 def ling_genkey(crypt_algo:str=None, sign_algo:str=None, key_length:int=None) -> dict:
     result = {}
-    
     if crypt_algo is None or crypt_algo == "cv25519":
         cv_priv_b85, cv_pub_b85 = gen_cv25519(True)
         result["cv25519"] = (cv_priv_b85, cv_pub_b85)
-    
     if sign_algo is None or sign_algo == "ed25519":
         ed_priv_b85, ed_pub_b85 = gen_ed25519(True)
         result["ed25519"] = (ed_priv_b85, ed_pub_b85)
-    
     return result
 
 def gen_key():
@@ -90,16 +100,16 @@ def gen_key():
         SIGN_ALGO
     )
     # 加密算法选择
-    print("\n可用的加密算法:")
+    print("\nAlgos for encryption:")
     for i, algo in enumerate(CRYPT_ALGO, 1):
         print(f"{i}. {algo}")
-    crypt_choice = input(f"选择加密算法 (1-{len(CRYPT_ALGO)}, 默认1): ").strip()
+    crypt_choice = input(f"Choose encryption algo (1-{len(CRYPT_ALGO)}, default 1): ").strip()
     crypt_algo = CRYPT_ALGO[int(crypt_choice)-1] if crypt_choice else "cv25519"
-    # 签名算法选择
-    print("\n可用的签名算法:")
+    # Signature algorithm selection
+    print("\nAlgos for signature:")
     for i, algo in enumerate(SIGN_ALGO, 1):
         print(f"{i}. {algo}")
-    sign_choice = input(f"选择签名算法 (1-{len(SIGN_ALGO)}, 默认1): ").strip()
+    sign_choice = input(f"Choose signature algo (1-{len(SIGN_ALGO)}, default 1): ").strip()
     sign_algo = SIGN_ALGO[int(sign_choice)-1] if sign_choice else "ed25519"
 
     username = os.getlogin()
@@ -135,111 +145,101 @@ def gen_key():
         #idx0, key_lkid1, key_lkid_short2, key_name3, key_email4, key_comment5, crypt_algo6, crypt_key_length7, sign_algo8, sign_key_length9, key_date10
         print(str(output[0])+". "+output[1]+"\n"+output[2]+" "+output[6]+"_"+str(output[7])+":"+output[8]+"_"+str(output[9])+"\n"+output[10]+"\n"+output[3]+" <"+output[4]+"> "+"\n"+output[5])
 
-def decrypt_key():
-    json_filename = input("File to decrypt (leave empty to use local key):").strip()
-    if json_filename:
-        with open(json_filename, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    else:
-        # 未指定文件，要求输入本地密钥库的lkid/lkid_short/name
-        lkid = input("Input lkid (leave empty to skip):").strip()
-        lkid_short = input("Input lkid_short (leave empty to skip):").strip()
-        name = input("Input name (leave empty to skip):").strip()
-        data = load_key(lkid=lkid, lkid_short=lkid_short, name=name)
-        if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
-            print(data)
-            return
-    priv_encrypted = data.get("priv_encrypted", False)
-    priv_key = data.get("priv_key", "")
-    pub_key = data.get("pub_key", "")
-    if priv_encrypted:
-        password = input("Passphrase for private key:").strip()
-        password = text_to_base64(password)
-        try:
-            priv_key = aes_decrypt(priv_key, password)
-            print(pub_key)
-            print("Decrypted private key:")
-            print(priv_key)
-        except Exception as e:
-            print("Err, password may be incorrect.")
+# def decrypt_key():
+#    json_filename = input("File to decrypt (leave empty to use local key):").strip()
+#    if json_filename:
+#        with open(json_filename, "r", encoding="utf-8") as f:
+#            data = json.load(f)
+#    else:
+#        # 未指定文件，要求输入本地密钥库的lkid/lkid_short/name
+#        lkid = input("Input lkid (leave empty to skip):").strip()
+#        lkid_short = input("Input lkid_short (leave empty to skip):").strip()
+#        name = input("Input name (leave empty to skip):").strip()
+#        data = load_key(lkid=lkid, lkid_short=lkid_short, name=name)
+#        if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
+#            print(data)
+#            return
+#    priv_encrypted = data.get("priv_encrypted", False)
+#    priv_key = data.get("priv_key", "")
+#    pub_key = data.get("pub_key", "")
+#    if priv_encrypted:
+#        password = input("Passphrase for private key:").strip()
+#        password = text_to_base64(password)
+#        try:
+#            priv_key = aes_decrypt(priv_key, password)
+#            print(pub_key)
+#            print("Decrypted private key:")
+#            print(priv_key)
+#        except Exception as e:
+#            print("Err, password may be incorrect.")
 
 def encrypt_file(filename=None, key_identifier=None):
-    if not key_identifier:
-        key_identifier = input("Input key identifier (lkid/lkid_short/name):").strip()
-    if not key_identifier:
-        print("Key identifier cannot be empty")
-        return
+    try:
+        if not key_identifier:
+            key_identifier = input("Input key identifier (lkid/lkid_short/name):").strip()
+        if not key_identifier:
+            raise ValueError("Key identifier cannot be empty")
+        # 加载公钥
+        data = load_key(lkid=key_identifier) if len(key_identifier) == 64 else load_key(name=key_identifier)
+        if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
+            raise ValueError(data)
 
-    # 加载公钥
-    if len(key_identifier) == 64:
-        data = load_key(lkid=key_identifier)
-    elif len(key_identifier) == 16:
-        data = load_key(lkid_short=key_identifier)
-    else:
-        data = load_key(name=key_identifier)
-
-    if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
-        print(data)
-        return
-    pub_key = data.get("pub_key", "")
-    if not pub_key:
-        print("ErrPubkeyNotFound")
-        return
+        pub_key = data.get("pub_key", "")
+        if not pub_key:
+            raise ValueError("Public key not found")
         # 读取文件
-    if not filename:
-        filename = input("File to encrypt:").strip()
-    with open(filename, "rb") as f:
-        plaintext = f.read()
+        if not filename:
+            filename = input("File to encrypt:").strip()
+        with open(filename, "rb") as f:
+            plaintext = f.read()
 
-    lkid = data.get("lkid", "")
-    ciphertext = ling_encrypt(plaintext, pub_key, lkid)
-    compressed_ciphertext = compress_data(ciphertext)
-    encrypted_file_to_data(filename, compressed_ciphertext)
+        lkid = data.get("lkid", "")
+        ciphertext = ling_encrypt(plaintext, pub_key, lkid)
+        compressed_ciphertext = compress_data(ciphertext)
+        encrypted_file_to_data(filename, compressed_ciphertext)
+    except Exception as e:
+        print(f"Error during encryption: {e}")    
 
 def decrypt_file(filename=None):
-    if not filename:
-        filename = input("File containing ciphertext:").strip()
-    if not filename.endswith('.lsed'):
-        print("ErrBadFormat")
-        return
-
-    with open(filename, "rb") as f:
-        compressed_data = f.read()
-    json_str = decompress_data(compressed_data)
-    cipher_data = json.loads(json_str)
-
-    ciphertext_compressed = cipher_data.get("ciphertext", "")
-    ciphertext_b64 = decompress_data(ciphertext_compressed)
-    plaintext_file = cipher_data.get("plaintext_file", "")
-    if not ciphertext_b64 or not plaintext_file:
-        print("ErrCiphertextOrPlaintextFileNotFound")
-        return
-    parts  = ciphertext_b64.split(':::')
-    if len(parts) != 5:
-        raise ValueError("无效的加密数据格式")
-    lkid, encrypted_aes_key, nonce_b64, tag_b64, ciphertext_b64 = parts
-
-    key_data = load_key(lkid=lkid)
-    if key_data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
-        print(key_data)
-        return
-
-    priv_key = key_data.get("priv_key", "")
-    if key_data.get("priv_encrypted", False):
-        password = input("Passphrase for private key:").strip()
-        password = text_to_base64(password)
-        try:
-            priv_key = aes_decrypt(priv_key, password)
-        except Exception:
-            print("Err, password may be incorrect.")
-            return
     try:
+        if not filename:
+            filename = input("File containing ciphertext:").strip()
+        if not filename.endswith('.lsed'):
+            raise ValueError("Invalid file format")
+
+        with open(filename, "rb") as f:
+            compressed_data = f.read()
+        json_str = decompress_data(compressed_data)
+        cipher_data = json.loads(json_str)
+
+        ciphertext_compressed = cipher_data.get("ciphertext", "")
+        ciphertext_b64 = decompress_data(ciphertext_compressed)
+        plaintext_file = cipher_data.get("plaintext_file", "")
+        if not ciphertext_b64 or not plaintext_file:
+            raise ValueError("Ciphertext or plaintext file not found")
+
+        parts = ciphertext_b64.split(':::')
+        if len(parts) != 5:
+            raise ValueError("Invalid encryption data format")
+        lkid, encrypted_aes_key, nonce_b64, tag_b64, ciphertext_b64 = parts
+
+        key_data = load_key(lkid=lkid)
+        if key_data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
+            raise ValueError(key_data)
+        priv_key = key_data.get("priv_key", "")
+        if key_data.get("priv_encrypted", False):
+            password = input("Passphrase for private key:").strip()
+            password = text_to_base64(password)
+            priv_key = aes_decrypt(priv_key, password)
+            if not priv_key:
+                raise ValueError("Private key decryption failed")
+
         plaintext = ling_decrypt(encrypted_aes_key, nonce_b64, tag_b64, ciphertext_b64, privkey_b85=priv_key)
         with open(plaintext_file, "wb") as f:
             f.write(plaintext)
-        print(f"Decryption OK: {plaintext_file}")
+        print(f"Decryption successful: {plaintext_file}")
     except Exception as e:
-        print("ErrDecryptFailed", e)
+        print(f"Error during decryption: {e}")
 
 def local_key(command):
     if command == "import":
@@ -312,53 +312,49 @@ def exportkey(cmd):
     else:
         print(f"OK. Key exported to {result}")
 
-
 def sign_file(filename=None, key_identifier=None):
-    if not key_identifier:
-        key_identifier = input("Input key identifier (lkid/lkid_short/name):").strip()
+    try:
+        if not key_identifier:
+            key_identifier = input("Input key identifier (lkid/lkid_short/name):").strip()
 
-    if len(key_identifier) == 64:
-        data = load_key(lkid=key_identifier)
-    elif len(key_identifier) == 16:
-        data = load_key(lkid_short=key_identifier)
-    else:
-        data = load_key(name=key_identifier)
-    if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
-        print(data)
-        return
-    
-    lkid = data.get("lkid", "")
-    priv_key = data.get("priv_sign", "")
-    if data.get("priv_encrypted", False):
-        password = input("Passphrase for private key:").strip()
-        password = text_to_base64(password)
-        priv_key = aes_decrypt(priv_key, password)
-    from pathlib import Path
-    if not filename:
-        filename = input("File to sign:").strip()
-    file_data = Path(filename).read_bytes()
+        data = load_key(lkid=key_identifier) if len(key_identifier) == 64 else load_key(name=key_identifier)
+        if data in ("NoLocalKeyFile", "NoLocalKey", "ErrNoMatchKey"):
+            raise ValueError(data)
 
-    sign_data = ling_sign(filename, file_data, lkid, priv_key)
-    sign_filename = filename + "_sign.lssd"
-    with open(sign_filename, "w", encoding="utf-8") as f:
-        json.dump(sign_data, f, ensure_ascii=False, indent=2)
-    print(f"Signature saved to: {sign_filename}")
+        lkid = data.get("lkid", "")
+        priv_key = data.get("priv_sign", "")
+        if data.get("priv_encrypted", False):
+            password = input("Passphrase for private key:").strip()
+            password = text_to_base64(password)
+            priv_key = aes_decrypt(priv_key, password)
+
+        if not filename:
+            filename = input("File to sign:").strip()
+        file_data = Path(filename).read_bytes()
+        sign_data = ling_sign(filename, file_data, lkid, priv_key)
+        sign_filename = filename + "_sign.lssd"
+        with open(sign_filename, "w", encoding="utf-8") as f:
+            json.dump(sign_data, f, ensure_ascii=False, indent=2)
+        print(f"Signature saved to: {sign_filename}")
+    except Exception as e:
+        print(f"Error during signing: {e}")
 
 def verify_sign(filename=None):
-    if not filename:
-        filename = input("File to verify:").strip()
-    from pathlib import Path
-    data = Path(filename).read_bytes()
-    valid, name = ling_vsign(data, filename)
-    if valid:
-        print(f"Good Signature from {name}")
-    else:
-        print("Signature verification failed")
+    try:
+        if not filename:
+            filename = input("File to verify:").strip()
+        from pathlib import Path
+        data = Path(filename).read_bytes()
+        valid, name = ling_vsign(data, filename)
+        if valid:
+            print(f"Good Signature from {name}")
+        else:
+            print("Signature verification failed")
+    except Exception as e:
+        print(f"Error during signature verification: {e}")
 
-import argparse
 def main():
     print(MAINAME+" Ver "+VERSION)
-
     parser = argparse.ArgumentParser(description="LingSecer secure tool")
     parser.add_argument("-g", "--genkey", action="store_true", help="Generate a new key")
     parser.add_argument("-e", "--encrypt", action="store_true", help="Encrypt a file")
@@ -386,7 +382,7 @@ def main():
     elif args.vsign:
         verify_sign(filename=args.file)
     elif args.import_keyfile:
-        local_key("import")  # 依旧会提示输入
+        local_key("import")
     elif args.list:
         local_key("list")
     elif args.del_identifier:
@@ -421,7 +417,6 @@ def main():
                 exportkey(cmd)
             else:
                 print("ErrCommandNotFound")
-
 
 
 if __name__ == "__main__":
